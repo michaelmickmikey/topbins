@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Top Bins</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: a floodlit pitch. Mown-stripe background, chalk-line panels, scoreboard numbers. Start screen first; in-game: scoreboard HUD, unbeaten-run ladder, prompt card + match report (stacked on phones). Single committed look. */
+:root{
+  color-scheme: dark;
+  --bg:#0f2a1c; --stripe:#12321f; --panel:#0a1d13; --panel-2:#123222; --line:#2d4d3a;
+  --fg:#f3f1e7; --muted:#a3b8a6; --accent:#ffd23f; --accent-ink:#1b1500;
+  --danger:#ff5247; --ok:#7ee08f;
+  --t0:#c9d1c3; --t1:#6ec3f0; --t2:#ff9d57; --t3:#ff72b6; --t4:#ffd23f;
+  --display:"Big Shoulders Display", "Impact", "Arial Narrow", sans-serif;
+  --body:"Barlow", "Segoe UI", system-ui, sans-serif;
+  --label:"Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg)}
+body{color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45;
+  background-image:repeating-linear-gradient(90deg,var(--bg) 0 80px,var(--stripe) 80px 160px)}
+.app{max-width:1040px;margin:0 auto;padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:16px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font-family:var(--label);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.num{font-family:var(--display);font-weight:800;font-variant-numeric:tabular-nums}
+
+/* header */
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--fg);padding-bottom:12px}
+.brand h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,9vw,72px);line-height:.82;margin:0;letter-spacing:.01em;text-transform:uppercase}
+.brand h1 span{color:var(--accent)}
+.brand p{margin:8px 0 0;font-family:var(--label);font-size:15px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+.modes button{white-space:nowrap;background:transparent;border:1px solid var(--line);padding:7px 12px;font-family:var(--label);font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.modes button.on{background:var(--fg);color:var(--panel);border-color:var(--fg)}
+.modes button:hover:not(.on){color:var(--fg);border-color:var(--muted)}
+
+/* chalk corner arc on key panels */
+.arc{position:relative}
+.arc::before{content:"";position:absolute;top:-2px;left:-2px;width:34px;height:34px;border-bottom-right-radius:34px;border-right:2px solid var(--fg);border-bottom:2px solid var(--fg);opacity:.85;pointer-events:none}
+
+/* lobby */
+.lobby{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+.lobby-main{background:var(--panel);border:2px solid var(--line);padding:28px;display:flex;flex-direction:column;gap:18px}
+.lobby-main h2{font-family:var(--display);font-weight:900;font-size:clamp(36px,6vw,56px);line-height:.92;margin:0;text-transform:uppercase;text-wrap:balance}
+.lobby-main .lede{margin:0;font-size:18px;max-width:46ch}
+.rules{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.rules li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;align-items:baseline}
+.rules li::before{content:"●";color:var(--accent);font-size:10px}
+.deploy{align-self:flex-start;background:var(--accent);color:var(--accent-ink);border:0;padding:12px 34px;font-family:var(--display);font-weight:900;font-size:32px;letter-spacing:.04em;text-transform:uppercase;animation:pulse 2.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,210,63,.45)}70%{box-shadow:0 0 0 14px rgba(255,210,63,0)}100%{box-shadow:0 0 0 0 rgba(255,210,63,0)}}
+.lobby-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.ghost{background:transparent;border:1px solid var(--line);padding:10px 16px;font-weight:600;color:var(--fg)}
+.ghost:hover{border-color:var(--muted)}
+.tiertable{background:var(--panel);border:2px solid var(--line);padding:18px;display:grid;gap:4px}
+.tiertable h3{margin:0 0 8px}
+.trow{display:grid;grid-template-columns:100px 34px minmax(0,1fr);gap:10px;align-items:baseline;padding:8px 10px;background:var(--bg);border-left:4px solid var(--c)}
+.trow .tn{font-family:var(--label);font-weight:700;color:var(--c);text-transform:uppercase;letter-spacing:.06em;font-size:16px}
+.trow .tk{font-family:var(--display);font-weight:800;font-size:18px;color:var(--c)}
+.trow .td{font-size:14px;color:var(--muted)}
+.method{margin:8px 0 0;font-size:13px;color:var(--muted)}
+.lobbystats{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--label);font-size:15px;color:var(--muted);letter-spacing:.04em}
+.lobbystats b{color:var(--fg);font-weight:700}
+
+/* help */
+.help{background:var(--panel);border:2px solid var(--accent);padding:16px 18px;display:grid;gap:12px}
+.help h2{font-family:var(--display);font-weight:900;font-size:28px;margin:0;text-transform:uppercase}
+.help .close{justify-self:start;background:var(--accent);color:var(--accent-ink);border:0;padding:8px 16px;font-family:var(--label);font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+
+/* scoreboard HUD */
+.hud{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:2px solid var(--line);background:#06120b}
+.stat{padding:10px 14px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:0;min-width:0}
+.stat:last-child{border-right:0}
+.stat .v{font-family:var(--display);font-weight:800;font-size:38px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums;align-self:flex-start;transform-origin:left center}
+.stat .v.bump{animation:bump .45s}
+@keyframes bump{30%{transform:scale(1.3);color:var(--fg)}}
+
+/* ladder */
+.ladder{position:relative;padding:28px 6px 48px}
+.track{position:relative;height:10px;background:#06120b;border:1px solid var(--line)}
+.fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--fg);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.fill.inv{background:var(--accent);box-shadow:0 0 14px var(--accent)}
+.notch{position:absolute;top:-24px;bottom:-32px;width:0}
+.notch::after{content:"";position:absolute;top:22px;height:14px;border-left:2px solid var(--muted)}
+.notch .n{font-family:var(--display);font-weight:800;font-size:15px;color:var(--muted);transform:translateX(-50%);position:absolute;top:0;left:0;white-space:nowrap}
+.notch .name{font-family:var(--label);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);position:absolute;bottom:0;white-space:nowrap;transform:translateX(-50%);left:0}
+.notch.alt .name{bottom:-15px}
+.notch.hit .n,.notch.hit .name{color:var(--accent)}
+.notch.hit::after{border-color:var(--accent)}
+.notch.last .name,.notch.last .n{transform:translateX(-100%)}
+
+/* main grid */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start}
+.card{background:var(--panel);border:2px solid var(--line);padding:24px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:var(--label);font-size:13px;font-weight:700;padding:2px 9px;border:1px solid var(--fg);letter-spacing:.08em;text-transform:uppercase}
+.subrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.roundlbl{font-family:var(--label);font-size:15px;font-weight:700;color:var(--accent);letter-spacing:.12em;text-transform:uppercase}
+#prompt{font-family:var(--body);font-weight:700;font-size:clamp(23px,3.6vw,32px);line-height:1.15;margin:0;text-wrap:balance}
+.meta{margin:0;color:var(--muted);font-size:14px}
+.inputzone{position:relative;display:flex;flex-direction:column;gap:12px}
+form{display:flex;gap:8px}
+#guess{flex:1;min-width:0;background:#06120b;border:2px solid var(--line);color:var(--fg);font-family:var(--body);font-size:19px;padding:12px 14px}
+#guess:focus{border-color:var(--fg)}
+#guess::placeholder{color:#6f8a74}
+#guess:disabled{opacity:.5}
+.fire{background:var(--accent);color:var(--accent-ink);border:0;padding:0 22px;font-family:var(--display);font-weight:900;font-size:24px;letter-spacing:.05em}
+.fire:disabled{opacity:.4;cursor:default}
+.timer{display:flex;align-items:center;gap:10px}
+.tbar-wrap{flex:1;height:8px;background:#06120b;border:1px solid var(--line);position:relative;overflow:hidden}
+.tbar{position:absolute;inset:0 auto 0 0;width:100%;background:var(--ok)}
+.tbar.warn{background:var(--accent)}
+.tbar.crit{background:var(--danger)}
+.tnum{font-family:var(--display);font-weight:800;font-size:26px;width:3em;text-align:right;font-variant-numeric:tabular-nums}
+.tnum.crit{color:var(--danger)}
+.countdown-ov{position:absolute;inset:-6px;display:flex;align-items:center;justify-content:center;gap:14px;background:rgba(10,29,19,.94);border:2px dashed var(--fg);z-index:2}
+.countdown-ov .lbl{font-family:var(--label);font-size:17px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.countdown-ov .cd{font-family:var(--display);font-weight:900;font-size:56px;line-height:1;color:var(--accent);min-width:1ch;text-align:center}
+.countdown-ov .cd.tick{animation:tick .7s}
+@keyframes tick{0%{transform:scale(1.6);opacity:0}30%{transform:scale(1);opacity:1}}
+.feedback{margin:0;min-height:1.45em;font-weight:600}
+.feedback.bad{color:var(--danger)}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;padding:0}
+.linkbtn:hover{color:var(--fg)}
+.shake{animation:shake .35s}
+@keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+
+/* result stamp */
+#result{display:flex;flex-direction:column;gap:14px}
+.score{position:relative;border:3px solid var(--c);background:#06120b;padding:22px 18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;overflow:hidden;animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+.score.kia{background:radial-gradient(circle at 50% 40%,rgba(255,82,71,.2),#06120b 70%)}
+.score .stamp{font-family:var(--display);font-weight:900;font-size:clamp(52px,10vw,84px);line-height:.9;color:var(--c);letter-spacing:.02em;text-transform:uppercase}
+.score .your{font-size:21px;font-weight:700}
+.score .pts{font-family:var(--label);font-size:18px;font-weight:600;letter-spacing:.04em}
+.score .pts b{color:var(--c)}
+.score .views{font-family:var(--label);font-size:14px;color:var(--muted);letter-spacing:.04em}
+.score .quip{color:var(--muted);font-size:15px;max-width:44ch;margin:0}
+.meter{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;width:100%;margin-top:10px}
+.step{display:flex;flex-direction:column;align-items:center;gap:0;padding:5px 2px;border:1px solid var(--line);background:var(--panel);color:var(--muted);opacity:.5}
+.step.on{opacity:1;background:var(--c);border-color:var(--c);color:#06120b;transform:translateY(-3px)}
+.step .sn{font-family:var(--label);font-size:13px;letter-spacing:.04em;text-transform:uppercase;font-weight:700}
+.step .sk{font-family:var(--display);font-weight:800;font-size:16px}
+.score-foot{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;font-family:var(--label);font-size:15px;color:var(--muted);letter-spacing:.04em;margin-top:6px}
+.score-foot b{color:var(--fg)}
+.score-foot .earned{color:var(--accent);font-weight:700}
+.ball{position:absolute;left:50%;top:48px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:var(--fg);box-shadow:inset -4px -4px 0 rgba(0,0,0,.25);pointer-events:none;animation:shot .55s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes shot{0%{transform:translate(-160px,120px) scale(.6);opacity:1}85%{opacity:1}100%{transform:translate(0,0) scale(1);opacity:0}}
+.next{align-self:center;background:var(--fg);color:#06120b;border:0;padding:12px 28px;font-family:var(--label);font-size:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+@keyframes pop{from{transform:scale(.96);opacity:.3}to{transform:none;opacity:1}}
+
+/* match report feed */
+.feed{background:var(--panel);border:2px solid var(--line);padding:14px;min-width:0}
+.feed h3{margin:0 0 10px}
+.feed ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.feed li{display:flex;gap:8px;align-items:baseline;padding:5px 8px;background:var(--bg);border-left:4px solid var(--line);animation:slide .3s ease-out}
+.feed li .r{color:var(--muted);font-family:var(--label);font-weight:700}
+.feed li .w{flex:1;min-width:0;overflow-wrap:anywhere}
+.feed li .g{font-family:var(--display);font-weight:800}
+.feed li.reward{border-left-color:var(--accent);color:var(--accent);font-family:var(--label);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.feed .empty{color:var(--muted);font-size:13px}
+@keyframes slide{from{opacity:.2;transform:translateX(10px)}to{opacity:1;transform:none}}
+
+/* full-time report */
+.aar{background:var(--panel);border:2px solid var(--line);padding:24px;display:grid;gap:18px}
+.aar h2{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,54px);margin:0;line-height:.9;text-transform:uppercase}
+.aar .rank{font-family:var(--label);font-size:17px;font-weight:700;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin:6px 0 0}
+.aarstats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;background:var(--line);border:2px solid var(--line)}
+.aarstats div{background:#06120b;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.aarstats .v{font-family:var(--display);font-weight:800;font-size:32px;line-height:1;color:var(--accent);overflow-wrap:anywhere}
+.aarstats .v.sm{font-size:22px}
+.emojirow{font-size:28px;letter-spacing:4px}
+.rounds{display:grid;gap:6px}
+.rounds .round{background:var(--bg);border-left:4px solid var(--c)}
+.rounds .row{display:grid;grid-template-columns:28px minmax(0,1fr) auto 14px;gap:10px;align-items:baseline;padding:9px 10px;cursor:pointer;list-style:none}
+.rounds .row::-webkit-details-marker{display:none}
+.rounds .row:hover,.rounds .round[open] .row{background:var(--panel-2)}
+.rounds .row .q{color:var(--muted);font-size:13px}
+.rounds .row .a{font-weight:700}
+.rounds .row .t{font-family:var(--label);font-size:15px;font-weight:700;white-space:nowrap;letter-spacing:.04em}
+.rounds .chev{color:var(--muted);transition:transform .2s}
+.rounds .round[open] .chev{transform:rotate(180deg)}
+.intel{display:grid;gap:8px;padding:12px 12px 14px 48px;border-top:1px solid var(--line)}
+.intel .tierrow{display:grid;grid-template-columns:100px minmax(0,1fr);gap:10px;align-items:start}
+.intel .lbl{font-family:var(--label);font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding-top:2px;color:var(--c)}
+.intel .ans{display:flex;flex-wrap:wrap;gap:5px}
+.intel .ans span{font-size:13px;padding:2px 7px;background:var(--panel);border:1px solid var(--line)}
+.intel .ans span i{font-style:normal;color:var(--muted);font-size:11px;margin-left:5px}
+.intel .ans span.mine{background:var(--c);border-color:var(--c);color:#06120b;font-weight:700}
+.intel .ans span.mine i{color:#06120b}
+.intel .src{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.primary{background:var(--accent);color:var(--accent-ink);border:0;padding:11px 18px;font-family:var(--label);font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.share-text{width:100%;font-family:var(--body);font-size:14px;background:#06120b;color:var(--fg);border:1px solid var(--line);padding:10px;resize:none}
+.countdown{font-family:var(--label);font-size:16px;color:var(--muted);letter-spacing:.04em}
+
+footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+footer a{color:var(--muted)}
+
+/* toast + invincible */
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-weight:900;font-size:24px;padding:8px 22px;letter-spacing:.03em;text-transform:uppercase;z-index:20;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:calc(100vw - 32px);text-align:center}
+.inv{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:radial-gradient(circle,rgba(255,236,170,.97),rgba(255,210,63,.92) 45%,rgba(40,30,0,.95));color:#1b1500;text-align:center;padding:24px;animation:flash 2.6s ease-out forwards}
+.inv .big{font-family:var(--display);font-weight:900;font-size:clamp(48px,11vw,110px);line-height:.9;text-transform:uppercase}
+.inv .sub{font-family:var(--label);font-weight:700;font-size:18px;letter-spacing:.2em;text-transform:uppercase}
+@keyframes flash{0%{opacity:0}8%{opacity:1}80%{opacity:1}100%{opacity:0}}
+
+@media (max-width:760px){
+  .grid,.lobby{grid-template-columns:minmax(0,1fr)}
+  .hud{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat:nth-child(2){border-right:0}
+  .stat:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .aarstats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .notch .name{display:none}
+  .ladder{padding-bottom:14px}
+  .card,.lobby-main{padding:18px}
+  .intel{padding-left:12px}
+  .intel .tierrow{grid-template-columns:minmax(0,1fr);gap:4px}
+}
+@media (max-width:460px){.modes button{padding:6px 9px;font-size:13px}.trow{grid-template-columns:88px 28px minmax(0,1fr)}.meter{gap:2px}.step .sn{font-size:10px;letter-spacing:0;overflow-wrap:anywhere;text-align:center;line-height:1.1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>TOP <span>BINS</span></h1>
+      <p id="dayTag">Daily Premier League deep cuts</p>
+    </div>
+    <nav class="modes" aria-label="Game mode">
+      <button id="modeDaily" class="on" type="button">Daily</button>
+      <button id="modeFfa" type="button">Kickabout</button>
+      <button id="helpBtn" type="button" aria-label="How to play">?</button>
+    </nav>
+  </header>
+
+  <section class="lobby" id="lobby" hidden>
+    <div class="lobby-main arc">
+      <span class="eyebrow" id="lobbyEyebrow">Matchday</span>
+      <h2>Skip the tap-ins. Aim for the corners.</h2>
+      <p class="lede">Seven Premier League prompts. Twenty seconds each. The less famous your answer, the more goals it's worth.</p>
+      <ul class="rules" id="rulesList"></ul>
+      <div class="lobby-actions">
+        <button class="deploy" id="deployBtn" type="button">Kick off</button>
+        <button class="ghost" id="lobbyFfa" type="button">Kickabout instead</button>
+      </div>
+      <div class="lobbystats" id="lobbyStats"></div>
+    </div>
+    <div class="tiertable">
+      <h3 class="eyebrow">How answers score</h3>
+      <div id="tierTable"></div>
+      <p class="method">Fame is measured, not guessed: each answer is ranked by how many times its Wikipedia page was read between July 2015 and September 2026. The most-read quarter are tap-ins; the least-read quarter are screamers.</p>
+    </div>
+  </section>
+
+  <section class="help" id="help" hidden>
+    <h2>Team talk</h2>
+    <ul class="rules" id="helpRules"></ul>
+    <button class="close" id="helpClose" type="button">Back to the game</button>
+  </section>
+
+  <div id="game" hidden>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <section class="hud" aria-label="Scoreboard">
+        <div class="stat"><span class="eyebrow">Round</span><span class="v" id="roundV">1/7</span></div>
+        <div class="stat"><span class="eyebrow">Goals</span><span class="v" id="killsV">0</span></div>
+        <div class="stat"><span class="eyebrow">Unbeaten run</span><span class="v" id="streakV">0</span></div>
+        <div class="stat"><span class="eyebrow">Best run</span><span class="v" id="bestV">0</span></div>
+      </section>
+
+      <section class="ladder" aria-label="Unbeaten run progress">
+        <div class="track"><div class="fill" id="fill"></div><div id="notches"></div></div>
+      </section>
+
+      <main class="grid" id="playArea">
+        <section class="card arc" id="play">
+          <div class="subrow"><span class="roundlbl" id="roundLbl">Round 1</span><div class="chips" id="chips"></div></div>
+          <h2 id="prompt"></h2>
+          <p class="meta" id="meta"></p>
+          <div class="inputzone" id="inputzone">
+            <form id="form" autocomplete="off">
+              <input id="guess" name="guess" type="text" placeholder="Type your answer" aria-label="Your answer" spellcheck="false" autocapitalize="off">
+              <button class="fire" id="fireBtn" type="submit">SHOOT</button>
+            </form>
+            <div class="timer" id="timer"><div class="tbar-wrap"><div class="tbar" id="tbar"></div></div><span class="tnum" id="tnum">20.0</span></div>
+            <div class="countdown-ov" id="cdOv" hidden><span class="lbl">Kick-off in</span><span class="cd" id="cdNum">3</span></div>
+          </div>
+          <div class="subrow" id="fbRow">
+            <p class="feedback" id="feedback" aria-live="polite"></p>
+            <button class="linkbtn" id="giveUp" type="button">Sub off (forfeit round)</button>
+          </div>
+          <div id="result" hidden></div>
+        </section>
+        <aside class="feed" aria-label="Match report">
+          <h3 class="eyebrow">Match report</h3>
+          <ol id="feed"></ol>
+        </aside>
+      </main>
+
+      <section class="aar" id="aar" hidden></section>
+    </div>
+  </div>
+
+  <footer>Fan-made trivia, not affiliated with the Premier League or any club. Answer lists and page-view figures come from <a href="https://en.wikipedia.org/wiki/Premier_League" target="_blank" rel="noopener">Wikipedia</a> (CC BY-SA), as of October 2026.</footer>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<div class="inv" id="inv" hidden><div class="sub">25-goal unbeaten run</div><div class="big">INVINCIBLE</div></div>
+
+<script>
+/* ---------- tiers & rewards ---------- */
+const TIERS = [
+  {name:"Tap-in",    kills:1, color:"var(--t0)", emoji:"⬜", desc:"The answer everyone blurts out.",
+   lines:["Even the kit man got that one.","An open goal. Fair enough.","Every pub in the country said that.","Straight off the back page."]},
+  {name:"Side-foot", kills:2, color:"var(--t1)", emoji:"🟦", desc:"Most fans would get there.",
+   lines:["Tidy finish. Most fans would have it.","Composed. Nothing flashy.","Solid pick from someone who watches MOTD."]},
+  {name:"Volley",    kills:3, color:"var(--t2)", emoji:"🟧", desc:"Now you're showing off.",
+   lines:["Sweetly struck. Not everyone remembers that.","That's a proper fan's answer.","Half the lobby forgot about that one."]},
+  {name:"Screamer",  kills:4, color:"var(--t3)", emoji:"🟪", desc:"Proper anorak territory.",
+   lines:["From 30 yards. Anorak territory.","Somebody owns a stack of old programmes.","That's a Football Manager save answer."]},
+  {name:"Top bins",  kills:5, color:"var(--t4)", emoji:"🎯", desc:"One hidden deep cut per prompt.",
+   lines:["Top bins. Nobody saw that coming.","Postage stamp. That's the hidden answer.","Where the spiders live. Unreal."]}
+];
+const KIA = {name:"Full time", kills:0, color:"var(--danger)", emoji:"🟥"};
+const REWARDS = [
+  {at:3, name:"Hat-trick", short:"Hat-trick"}, {at:5, name:"Man of the Match", short:"MOTM"}, {at:7, name:"Team of the Week", short:"TOTW"},
+  {at:11, name:"Player of the Month", short:"POTM"}, {at:15, name:"Golden Boot", short:"Golden Boot"}, {at:25, name:"Invincible", short:"Invincible"}
+];
+const ROUNDS = 7, TIME = 20, KEY = "tb-daily-";
+const RULES = [
+  "Seven prompts a day, the same for everyone. Give one answer per prompt.",
+  "You get 20 seconds and unlimited shots. Wrong answers cost nothing but time.",
+  "If the clock runs out it's full time: no goals for that round, and your unbeaten run resets.",
+  "Every prompt hides one deep cut worth top bins. Keep a 25-goal unbeaten run going to go Invincible."
+];
+
+/* ---------- question bank (generated from Wikipedia) ----------
+   a: [display name, extra aliases separated by |, page views in thousands], sorted most-read first.
+   gem: the hidden top-bins answer. */
+const BANK = [{"id":"clubs","q":"Name a club that has played in the Premier League","tag":"Clubs","kind":"club","gem":"Swindon Town","a":[["Manchester United","Man U|Man United|Man Utd",70088],["Chelsea","",53827],["Liverpool","",53289],["Arsenal","",48729],["Manchester City","Man City",47540],["Tottenham Hotspur","Spurs|Tottenham",35968],["Leicester City","",23331],["Newcastle United","Newcastle",20952],["Aston Villa","Villa",20275],["West Ham United","West Ham",19318],["Everton","",18708],["Leeds United","",16375],["Nottingham Forest","Forest|Notts Forest",15847],["Crystal Palace","Palace",15373],["Sunderland","",14285],["Wolverhampton Wanderers","Wolves",14175],["Brighton & Hove Albion","Brighton",12921],["Fulham","",11564],["Southampton","",11409],["Burnley","",9790],["Brentford","",9719],["Watford","",9707],["Blackburn Rovers","",9251],["West Bromwich Albion","WBA|West Brom",8318],["Derby County","",8263],["Sheffield Wednesday","Sheff Wed|Sheffield Weds",8245],["Sheffield United","Sheff Utd|Sheffield Utd",8009],["Middlesbrough","Boro",7903],["Queens Park Rangers","QPR",7571],["Norwich City","",7554],["Swansea City","",7480],["Stoke City","",7289],["Ipswich Town","",7245],["Birmingham City","",7164],["Hull City","",6762],["Bournemouth","AFC Bournemouth",6737],["Luton Town","",6657],["Coventry City","",6561],["Bolton Wanderers","",6393],["Cardiff City","",6090],["Huddersfield Town","",5762],["Portsmouth","",5727],["Charlton Athletic","",5327],["Wigan Athletic","",5285],["Reading","",4770],["Blackpool","",3902],["Barnsley","",3667],["Bradford City","",3185],["Oldham Athletic","",2868],["Wimbledon","Crazy Gang",2831],["Swindon Town","",2792]]},{"id":"champions","q":"Name a club that has won the Premier League","tag":"Clubs","kind":"club","gem":"Blackburn Rovers","a":[["Manchester United","Man U|Man United|Man Utd",70088],["Chelsea","",53827],["Liverpool","",53289],["Arsenal","",48729],["Manchester City","Man City",47540],["Leicester City","",23331],["Blackburn Rovers","",9251]]},{"id":"relegated","q":"Name a club that has been relegated from the Premier League","tag":"Clubs","kind":"club","gem":"Oldham Athletic","a":[["Manchester City","Man City",47540],["Leicester City","",23331],["Newcastle United","Newcastle",20952],["Aston Villa","Villa",20275],["West Ham United","West Ham",19318],["Leeds United","",16375],["Nottingham Forest","Forest|Notts Forest",15847],["Crystal Palace","Palace",15373],["Sunderland","",14285],["Wolverhampton Wanderers","Wolves",14175],["Fulham","",11564],["Southampton","",11409],["Burnley","",9790],["Watford","",9707],["Blackburn Rovers","",9251],["West Bromwich Albion","WBA|West Brom",8318],["Derby County","",8263],["Sheffield Wednesday","Sheff Wed|Sheffield Weds",8245],["Sheffield United","Sheff Utd|Sheffield Utd",8009],["Middlesbrough","Boro",7903],["Queens Park Rangers","QPR",7571],["Norwich City","",7554],["Swansea City","",7480],["Stoke City","",7289],["Ipswich Town","",7245],["Birmingham City","",7164],["Hull City","",6762],["Bournemouth","AFC Bournemouth",6737],["Luton Town","",6657],["Coventry City","",6561],["Bolton Wanderers","",6393],["Cardiff City","",6090],["Huddersfield Town","",5762],["Portsmouth","",5727],["Charlton Athletic","",5327],["Wigan Athletic","",5285],["Reading","",4770],["Blackpool","",3902],["Barnsley","",3667],["Bradford City","",3185],["Oldham Athletic","",2868],["Wimbledon","Crazy Gang",2831],["Swindon Town","",2792]]},{"id":"goldenboot","q":"Name a Premier League Golden Boot winner","tag":"Awards","kind":"person","gem":"Kevin Phillips","a":[["Cristiano Ronaldo","CR7",169605],["Erling Haaland","Erling",43536],["Harry Kane","",42016],["Mohamed Salah","",34611],["Luis Suárez","",25678],["Thierry Henry","Thierry|Titi",24602],["Jamie Vardy","",21294],["Sergio Agüero","Kun Aguero",18450],["Pierre-Emerick Aubameyang","",18225],["Son Heung-min","",17788],["Sadio Mané","",17511],["Didier Drogba","",14306],["Michael Owen","",14011],["Robin van Persie","RVP",12369],["Alan Shearer","",12252],["Carlos Tevez","",10054],["Ruud van Nistelrooy","RVN",9887],["Nicolas Anelka","",7920],["Dimitar Berbatov","",6891],["Dwight Yorke","",5743],["Andy Cole","",5272],["Teddy Sheringham","",4754],["Jimmy Floyd Hasselbaink","",4407],["Dion Dublin","",4229],["Chris Sutton","",2718],["Kevin Phillips","",2400]]},{"id":"hundred","q":"Name a player with 100 or more Premier League goals","tag":"Goals","kind":"person","gem":"Les Ferdinand","a":[["Cristiano Ronaldo","CR7",169605],["Erling Haaland","Erling",43536],["Harry Kane","",42016],["Mohamed Salah","",34611],["Wayne Rooney","",30494],["Romelu Lukaku","",26222],["Thierry Henry","Thierry|Titi",24602],["Jamie Vardy","",21294],["Raheem Sterling","",19283],["Sergio Agüero","Kun Aguero",18450],["Frank Lampard","",17926],["Son Heung-min","",17788],["Sadio Mané","",17511],["Steven Gerrard","",15899],["Didier Drogba","",14306],["Michael Owen","",14011],["Peter Crouch","",12472],["Robin van Persie","RVP",12369],["Alan Shearer","",12252],["Ryan Giggs","",11749],["Ian Wright","",11330],["Nicolas Anelka","",7920],["Robbie Keane","",7821],["Jermain Defoe","",7804],["Paul Scholes","",7679],["Dwight Yorke","",5743],["Robbie Fowler","",5369],["Andy Cole","",5272],["Teddy Sheringham","",4754],["Jimmy Floyd Hasselbaink","",4407],["Dion Dublin","",4229],["Emile Heskey","",3858],["Matt Le Tissier","Le God",3545],["Darren Bent","",3001],["Les Ferdinand","",2720]]},{"id":"fivehundred","q":"Name a player with 500 or more Premier League appearances","tag":"Appearances","kind":"person","gem":"Mark Schwarzer","a":[["Frank Lampard","",17926],["Steven Gerrard","",15899],["Ryan Giggs","",11749],["James Milner","",11432],["Rio Ferdinand","",9360],["Jamie Carragher","",5968],["Phil Neville","",5489],["Gareth Barry","",5213],["Gary Speed","",4561],["Sol Campbell","",4538],["Emile Heskey","",3858],["David James","",3433],["Mark Schwarzer","",2141]]},{"id":"potsplayer","q":"Name a Premier League Player of the Season winner","tag":"Awards","kind":"person","gem":"Juninho Paulista","a":[["Cristiano Ronaldo","CR7",169605],["Erling Haaland","Erling",43536],["Mohamed Salah","",34611],["Wayne Rooney","",30494],["Luis Suárez","",25678],["Gareth Bale","",25050],["Thierry Henry","Thierry|Titi",24602],["Jamie Vardy","",21294],["Eden Hazard","",21263],["Kevin De Bruyne","KDB",18559],["Frank Lampard","",17926],["N'Golo Kanté","",15291],["Virgil van Dijk","VVD|Virgil",15221],["Michael Owen","",14011],["Phil Foden","",12319],["Alan Shearer","",12252],["Ruud van Nistelrooy","RVN",9887],["Vincent Kompany","",8643],["Patrick Vieira","",8528],["Bruno Fernandes","",8465],["Peter Schmeichel","",8392],["Dwight Yorke","",5743],["Nemanja Vidić","",4481],["Rúben Dias","",3997],["Freddie Ljungberg","",2680],["Kevin Phillips","",2400],["Juninho Paulista","Juninho",2083]]},{"id":"goldenglove","q":"Name a Premier League Golden Glove winner","tag":"Keepers","kind":"person","gem":"Matz Sels","a":[["David de Gea","",12151],["Thibaut Courtois","",10952],["Joe Hart","",8291],["Petr Čech","",7180],["Wojciech Szczęsny","",6126],["Edwin van der Sar","",5481],["Pepe Reina","",4659],["Alisson","Alisson Becker",4160],["David Raya","",3842],["Ederson","Ederson Moraes",3836],["Matz Sels","",981]]},{"id":"motseason","q":"Name a Premier League Manager of the Season winner","tag":"Managers","kind":"person","gem":"George Burley","a":[["José Mourinho","Jose|The Special One",31645],["Pep Guardiola","Pep",28780],["Jürgen Klopp","Kloppo",22111],["Alex Ferguson","Fergie|Sir Alex|Sir Alex Fergie|Sir Alex Ferguson",17645],["Mikel Arteta","",15081],["Antonio Conte","",11972],["Arsène Wenger","Arsene",11804],["Claudio Ranieri","",7962],["Kenny Dalglish","King Kenny",7052],["Harry Redknapp","Arry",6784],["Arne Slot","",5658],["Alan Pardew","",2613],["Tony Pulis","",2303],["George Burley","",526]]},{"id":"titlemanagers","q":"Name a manager who has won the Premier League","tag":"Managers","kind":"person","gem":"Manuel Pellegrini","a":[["José Mourinho","Jose|The Special One",31645],["Pep Guardiola","Pep",28780],["Jürgen Klopp","Kloppo",22111],["Carlo Ancelotti","",19665],["Alex Ferguson","Fergie|Sir Alex|Sir Alex Fergie|Sir Alex Ferguson",17645],["Mikel Arteta","",15081],["Antonio Conte","",11972],["Arsène Wenger","Arsene",11804],["Claudio Ranieri","",7962],["Kenny Dalglish","King Kenny",7052],["Roberto Mancini","",6444],["Arne Slot","",5658],["Manuel Pellegrini","",4768]]},{"id":"managers","q":"Name someone who has managed a Premier League club (caretakers count)","tag":"Managers","kind":"person","gem":"Bruno Saltor","a":[["José Mourinho","Jose|The Special One",31645],["Pep Guardiola","Pep",28780],["Jürgen Klopp","Kloppo",22111],["Carlo Ancelotti","",19665],["Frank Lampard","",17926],["Alex Ferguson","Fergie|Sir Alex|Sir Alex Fergie|Sir Alex Ferguson",17645],["Steven Gerrard","",15899],["Mikel Arteta","",15081],["Thomas Tuchel","",13726],["Mauricio Pochettino","",13329],["Xabi Alonso","",12974],["Roy Keane","",12661],["Ole Gunnar Solskjær","",12591],["Alan Shearer","",12252],["Antonio Conte","",11972],["Arsène Wenger","Arsene",11804],["Gareth Southgate","",11797],["Ryan Giggs","",11749],["Unai Emery","",10108],["Ruud van Nistelrooy","RVN",9887],["Erik ten Hag","",9356],["Vincent Kompany","",8643],["Patrick Vieira","",8528],["Rafael Benítez","",8121],["Michael Carrick","",8098],["Claudio Ranieri","",7962],["Ronald Koeman","",7790],["Ange Postecoglou","",7733],["David Moyes","",7726],["Kevin Keegan","",7717],["Marcelo Bielsa","",7304],["Brendan Rodgers","",7100],["Kenny Dalglish","King Kenny",7052],["Roy Hodgson","",6946],["Harry Redknapp","Arry",6784],["Sam Allardyce","Big Sam",6661],["Louis van Gaal","",6650],["Ruud Gullit","",6632],["Brian Clough","",6554],["Nuno Espírito Santo","",6540],["Ralf Rangnick","",6533],["Roberto Mancini","",6444],["Graham Potter","",6371],["Roberto Martínez","",6201],["Eddie Howe","",6014],["Arne Slot","",5658],["Graeme Souness","",5460],["Steve Bruce","",5458],["Maurizio Sarri","",5436],["Enzo Maresca","",5421],["Sven-Göran Eriksson","",5356],["Mark Hughes","",5301],["Julen Lopetegui","",5080],["Scott Parker","",5031],["Roberto De Zerbi","",4812],["Manuel Pellegrini","",4768],["Sean Dyche","",4710],["Jesse Marsch","",4341],["Liam Rosenior","",4332],["André Villas-Boas","",4312],["Paul Ince","",4264],["Bobby Robson","Sir Bobby Robson",4212],["Duncan Ferguson","",4051],["Glenn Hoddle","",3943],["Martin O'Neill","",3908],["Gianfranco Zola","",3893],["Tony Adams","",3820],["Gianluca Vialli","",3644],["Darren Fletcher","",3639],["Neil Warnock","",3630],["Andoni Iraola","",3618],["Frank de Boer","",3611],["Marco Silva","",3536],["Michael Laudrup","",3528],["Álvaro Arbeloa","",3520],["Roberto Di Matteo","",3349],["Ryan Mason","",3311],["Bryan Robson","",3304],["Thomas Frank","",3283],["Chris Coleman","",3183],["Terry Venables","",3164],["Guus Hiddink","",3067],["Ruben Amorim","",3040],["Slaven Bilić","",3031],["Steve McClaren","",2959],["Paolo Di Canio","",2945],["Igor Tudor","",2888],["Russell Martin","",2770],["Daniel Farke","",2763],["Stuart Pearce","",2739],["Freddie Ljungberg","",2680],["Steve Cooper","",2646],["Ray Wilkins","",2616],["Alan Pardew","",2613],["Oliver Glasner","",2580],["Chris Hughton","",2572],["Kieran McKenna","",2513],["Chris Wilder","",2452],["Luiz Felipe Scolari","",2432],["Mick McCarthy","",2408],["Dean Smith","",2327],["David Wagner","",2319],["Tony Pulis","",2303],["Rob Edwards","",2276],["Paul Lambert","",2267],["Trevor Francis","",2230],["Ralph Hasenhüttl","",2187],["Leighton Baines","",2176],["Dick Advocaat","",2162],["Gary O'Neil","",2160],["Steve Clarke","",2144],["Nigel Pearson","",2104],["Tim Sherwood","",1960],["Ron Atkinson","",1931],["Bob Bradley","",1901],["Gordon Strachan","",1879],["Gérard Houllier","",1857],["Gus Poyet","",1830],["Tony Mowbray","",1777],["Marco Rose","",1742],["Nathan Jones","",1722],["Fabian Hürzeler","",1670],["Garry Monk","",1651],["Ian Holloway","",1640],["Avram Grant","",1637],["Gary McAllister","",1623],["Darren Moore","",1618],["Quique Sánchez Flores","",1590],["Claude Puel","",1536],["Javi Gracia","",1507],["David O'Leary","",1493],["Keith Andrews","",1475],["Aitor Karanka","",1474],["Mauricio Pellegrino","",1435],["Bruno Lage","",1431],["Mike Phelan","",1410],["Ossie Ardiles","Osvaldo Ardiles",1401],["Slaviša Jokanović","",1381],["Alex Neil","",1378],["Vítor Pereira","",1345],["Paul Heckingbottom","",1333],["Alan Ball","Alan Ball Jr.",1307],["Matthias Jaissle","",1302],["Brian Kidd","",1293],["Graham Taylor","",1283],["Paul Clement","",1274],["Carlos Carvalhal","",1272],["Steve Coppell","",1250],["Owen Coyle","",1220],["Walter Smith","",1214],["Alex McLeish","",1205],["Peter Reid","",1204],["Walter Mazzarri","",1180],["Felix Magath","",1178],["Craig Shakespeare","",1136],["Juande Ramos","",1115],["Steve Holland","",1112],["Ivan Jurić","",992],["Tomas Brolin","",963],["Martin Jol","",961],["Howard Kendall","",941],["Rémi Garde","",930],["Glenn Roeder","",891],["Michael Appleton","",881],["Joe Jordan","",862],["Régis Le Bris","",848],["Nigel Adkins","",846],["Trevor Brooking","",840],["Clive Allen","",836],["René Meulensteen","",835],["Phil Brown","",825],["Phil Thompson","",819],["Phil Neal","",803],["Rubén Sellés","",793],["Sammy Lee","",785],["Billy Bonds","",785],["Iain Dowie","",780],["Joe Kinnear","",758],["Alan Curbishley","",750],["Eddie Gray","",748],["Malky Mackay","",742],["David Unsworth","",709],["Stuart McCall","",672],["Graeme Jones","",668],["Attilio Lombardo","",667],["Jean Tigana","",661],["Howard Wilkinson","",657],["Peter Taylor","",650],["Bruce Rioch","",640],["John Gregory","",632],["Roy Evans","",631],["Terry McDermott","",616],["Paul Jewell","",610],["John Wark","",598],["Joe Royle","",592],["Graham Rix","",587],["Aidy Boothroyd","",559],["David Pleat","",553],["Sergej Jakirović","",551],["Leon Britton","",551],["Pat Rice","",547],["Dave Bassett","",547],["George Graham","",544],["John Carver","",531],["George Burley","",526],["Steve Kean","",525],["Mark McGhee","",511],["Cristian Stellini","",509],["Gary Megson","",502],["Steve Perryman","",496],["Francesco Guidolin","",488],["Lawrie Sanchez","",471],["Calum McFarlane","",452],["Brian McDermott","",451],["Pierre Sage","",448],["Billy Davies","",434],["Bobby Gould","",419],["Christian Gross","",416],["Jim Smith","",400],["Colin Todd","",390],["Gerry Francis","",387],["Hayden Mullins","",379],["Alan Irvine","",376],["Dave Jones","",371],["Paul Sturrock","",355],["Jacques Santini","",347],["Pepe Mel","",338],["Micky Adams","",337],["Michael Skubala","",336],["Eric Black","",331],["Ray Lewington","",331],["Dave Watson","",329],["Frank Clark","",326],["Mark Hudson","",323],["Mike Jackson","",319],["Danny Wilson","",315],["Xisco Muñoz","",315],["Paddy McCarthy","",306],["Mark Bowen","",305],["David Webb","",299],["Steve Agnew","",277],["Tony Book","",275],["Jan Siewert","",260],["Paul Hart","",253],["Chris Ramsey","",247],["Terry Connor","",245],["Ian Porterfield","",244],["Ricky Sbragia","",235],["Kevin Bond","",234],["Kevin Ball","",230],["Mike Walker","",229],["Brian Laws","",227],["Nigel Worthington","",225],["John Lyall","",224],["Egil Olsen","",220],["Roy McFarland","",216],["Archie Knox","",211],["Brian Little","",210],["Alan Curtis","",206],["Stuart Gray","",203],["Alain Perrin","",203],["Lennie Lawrence","",199],["Brian Horton","",190],["Alex Inglethorpe","",190],["Kevin MacDonald","",185],["Jim Jefferies","",183],["Kelvin Davis","",181],["Stewart Houston","",175],["Steve Davis","",171],["Simon Rusk","",169],["Aaron Danks","",168],["Ray Harford","",160],["Velimir Zajec","",150],["Eddie Niedzwiecki","",147],["Mike Stowell","",142],["John Gorman","",142],["Les Reed","",134],["Keith Millen","",132],["Rob Kelly","",131],["Alan Smith","",130],["Kevin Keen","",128],["Tony Parkes","",127],["Ron Noades","",125],["Peter Shreeves","",121],["Keith Downing","",119],["Scott Marshall","",112],["Neil Adams","",112],["Adam Sadler","",105],["Doug Livermore","",102],["Jimmy Gabriel","",94],["John Deehan","",91],["David Kerslake","",83],["Chris Hutchings","",82],["Steve Wigley","",81],["Ian Branfoot","",76],["Frank Burrows","",72],["Paul Goddard","",60],["James Collins","Jamie Collins",54],["Terry Burton","",48],["Bruno Saltor","Bruno",41],["Billy McEwan","",41],["Dave Merrington","",36],["Frank Barlow","",25],["Ben Dawson","",22],["Jim Barron","",7]]},{"id":"hattricks","q":"Name a player who has scored a Premier League hat-trick","tag":"Goals","kind":"person","gem":"Somen Tchoyi","a":[["Cristiano Ronaldo","CR7",169605],["Erling Haaland","Erling",43536],["Harry Kane","",42016],["Mohamed Salah","",34611],["Wayne Rooney","",30494],["Romelu Lukaku","",26222],["Luis Suárez","",25678],["Gareth Bale","",25050],["Thierry Henry","Thierry|Titi",24602],["Jamie Vardy","",21294],["Eden Hazard","",21263],["Raheem Sterling","",19283],["Christian Pulisic","",19065],["Kevin De Bruyne","KDB",18559],["Sergio Agüero","Kun Aguero",18450],["Pierre-Emerick Aubameyang","",18225],["Frank Lampard","",17926],["Son Heung-min","",17788],["Sadio Mané","",17511],["Mario Balotelli","",17040],["Steven Gerrard","",15899],["Olivier Giroud","",15896],["Fernando Torres","",14727],["Didier Drogba","",14306],["Alexis Sánchez","",14170],["Michael Owen","",14011],["Diogo Jota","",13815],["Álvaro Morata","",12856],["Ole Gunnar Solskjær","",12591],["Peter Crouch","",12472],["Robin van Persie","RVP",12369],["Phil Foden","",12319],["Alan Shearer","",12252],["Anthony Martial","",11911],["Riyad Mahrez","",11661],["Diego Costa","",11493],["Ian Wright","",11330],["Samuel Eto'o","",11119],["Roberto Firmino","",10854],["Carlos Tevez","",10054],["Ruud van Nistelrooy","RVN",9887],["Eric Cantona","",9864],["Gabriel Jesus","",9729],["Daniel Sturridge","",9482],["Mason Mount","",9188],["Cole Palmer","",9132],["Alexander Isak","",9093],["Tammy Abraham","",8953],["Edin Džeko","",8654],["Yaya Touré","",8537],["Bruno Fernandes","",8465],["Aaron Ramsey","",8229],["Nicolas Anelka","",7920],["Robbie Keane","",7821],["Jermain Defoe","",7804],["Robinho","",7800],["Paul Scholes","",7679],["Theo Walcott","",7498],["Bernardo Silva","",7340],["Ivan Toney","",6976],["Ferran Torres","",6925],["Dimitar Berbatov","",6891],["Andy Carroll","",6653],["Emmanuel Adebayor","",6522],["Georginio Wijnaldum","",6449],["Dennis Bergkamp","",6199],["Jürgen Klinsmann","",6044],["Adam Johnson","",6010],["Dominic Solanke","",5786],["Ollie Watkins","",5748],["Dwight Yorke","",5743],["Clint Dempsey","",5552],["Eberechi Eze","",5406],["Robbie Fowler","",5369],["Amad Diallo","",5322],["Noni Madueke","",5308],["Mark Hughes","",5301],["Andy Cole","",5272],["Chris Wood","",5267],["Patrick Bamford","",5190],["Christian Benteke","",5080],["Michail Antonio","",4916],["Dominic Calvert-Lewin","",4831],["Teddy Sheringham","",4754],["Kelechi Iheanacho","",4749],["Jarrod Bowen","",4712],["Gary Speed","",4561],["Santi Cazorla","",4526],["Lucas Moura","",4524],["Nicolas Jackson","",4476],["Jimmy Floyd Hasselbaink","",4407],["Matheus Cunha","",4371],["Eddie Nketiah","",4245],["Shinji Kagawa","",4240],["Dion Dublin","",4229],["Justin Kluivert","",4178],["Leandro Trossard","",4065],["Duncan Ferguson","",4051],["Nwankwo Kanu","Kanu",3978],["Gianfranco Zola","",3893],["Teemu Pukki","",3873],["Emile Heskey","",3858],["André Schürrle","",3678],["João Pedro","",3659],["Gianluca Vialli","",3644],["Demba Ba","",3610],["Gerard Deulofeu","",3605],["Matthew Le Tissier","Le God|Matt Le Tissier",3545],["Eiður Guðjohnsen","",3499],["Andrei Arshavin","Andrei Arshavin|Andrey Arshavin",3390],["Charlie Austin","",3278],["Louis Saha","",3124],["Omar Marmoush","",3123],["Jermaine Pennant","",3120],["Yannick Bolasie","",3113],["Andre Gray","",3069],["Dirk Kuyt","",3051],["Darren Bent","",3001],["Jack Harrison","",2816],["Morgan Gibbs-White","",2801],["Evan Ferguson","",2780],["Les Ferdinand","",2720],["Chris Sutton","",2718],["Freddie Ljungberg","",2680],["Gabriel Agbonlahor","",2561],["Salomón Rondón","",2497],["Yossi Benayoun","",2405],["Kevin Phillips","",2400],["Mark Viduka","",2362],["Marc Overmars","",2297],["Jean-Philippe Mateta","",2265],["Peter Beardsley","",2263],["Ayoze Pérez","",2230],["Robert Pires","",2156],["Kevin Campbell","",2114],["Salomon Kalou","",2107],["Roque Santa Cruz","",2079],["Brian Brobbey","",2016],["Milan Baroš","",1993],["Stan Collymore","",1951],["Kevin Nolan","",1902],["Gordon Strachan","",1879],["Peter Odemwingie","",1815],["David Bentley","",1783],["Callum Wilson","",1714],["John Carew","",1639],["Gary McAllister","",1623],["Andrei Kanchelskis","",1584],["Ray Parlour","",1542],["Igor Thiago","",1503],["Dean Saunders","",1489],["Maxi Rodríguez","",1476],["Fabrizio Ravanelli","",1412],["Steven Naismith","",1409],["Jonathan Walters","",1386],["Mark Robins","",1341],["Yakubu","",1285],["Dean Windass","",1270],["Sylvain Wiltord","",1182],["Tore André Flo","",1164],["James Beattie","",1121],["Tony Yeboah","",1064],["Robert Earnshaw","",1062],["Benjani Mwaruwari","",1028],["Savo Milošević","",999],["Nick Barmby","",884],["Elijah Adebayo","",883],["Tony Cottee","",837],["Arouna Koné","",824],["Marcus Bent","",797],["Patrik Berger","",792],["Paulo Wanchope","",758],["Marlon Harewood","",737],["Darren Huckerby","",689],["Henri Camara","",684],["Peter Ndlovu","",668],["Andrew Johnson","",668],["Michael Bridges","",661],["Kevin Schade","",640],["Leon Best","",631],["Mikael Forssell","",586],["Jan Åge Fjørtoft","",575],["Pavel Pogrebnyak","",562],["Brian Deane","",554],["Dango Ouattara","",546],["Micky Quinn","",545],["Chris Bart-Williams","",499],["Afonso Alves","",482],["Jordi Gómez","",479],["Marcus Stewart","",468],["Efan Ekoku","",462],["Steve Watson","",411],["Dean Holdsworth","",410],["Mark Walters","",371],["Rod Wallace","",371],["Fredi Bobic","",363],["Joshua King","",346],["Steffen Iversen","",337],["Kevin Gallacher","",309],["Gavin Peacock","",303],["Kevin Lisbie","",298],["Luke Moore","",289],["Chris Armstrong","",252],["Aruna Dindane","",239],["Clive Mendonca","",221],["Tommy Johnson","",214],["Andy Sinton","",207],["John Hendrie","",201],["Paul Kitson","",185],["Andy Booth","",145],["Bradley Allen","",109],["Ian Marshall","",96],["Somen Tchoyi","",88]]},{"id":"stadiums","q":"Name a ground that has hosted Premier League football (any of its names)","tag":"Grounds","kind":"ground","gem":"County Ground","a":[["Wembley Stadium","",10824],["Old Trafford","",5699],["Tottenham Hotspur Stadium","New White Hart Lane|Spurs Stadium",5098],["Etihad Stadium","City of Manchester Stadium|Etihad",4949],["Anfield","",4931],["Stamford Bridge","",4346],["Emirates Stadium","Emirates",4264],["London Stadium","Olympic Stadium",3224],["White Hart Lane","",2588],["Goodison Park","",2282],["St James' Park","",2212],["Hill Dickinson Stadium","Bramley-Moore Dock|Everton Stadium|Hill Dickinson",2211],["Boleyn Ground","Upton Park",2046],["Craven Cottage","",1914],["Villa Park","",1832],["Selhurst Park","",1787],["Arsenal Stadium","Highbury",1764],["Brentford Community Stadium","Gtech|Gtech Community Stadium",1698],["Hillsborough Stadium","Hillsborough",1682],["Elland Road","",1668],["Falmer Stadium","American Express Community Stadium|American Express Stadium|Amex|Amex Stadium|Falmer",1622],["Stadium of Light","SoL",1608],["Coventry Building Society Arena","CBS Arena|Ricoh|Ricoh Arena",1591],["King Power Stadium","King Power|Walkers Stadium",1485],["Molineux Stadium","",1431],["Kenilworth Road","",1402],["Dean Court","Vitality Stadium",1375],["Maine Road","",1363],["City Ground","",1273],["Cardiff City Stadium","",1143],["Bramall Lane","",1132],["Loftus Road","",1118],["Toughsheet Community Stadium","Macron|Macron Stadium|Reebok|Reebok Stadium|Toughsheet|University of Bolton Stadium",1050],["Turf Moor","",961],["St Mary's Stadium","St Mary's",908],["St Andrew's","",870],["MKM Stadium","KC Stadium|KCOM|KCOM Stadium|MKM",822],["Pride Park Stadium","Pride Park|iPro Stadium",793],["Portman Road","",748],["bet365 Stadium","Bet 365 Stadium|Bet365|Britannia|Britannia Stadium",740],["Vicarage Road","",739],["Riverside Stadium","Riverside",695],["Fratton Park","",682],["Swansea.com Stadium","Liberty|Liberty Stadium",679],["The Hawthorns","",677],["Ewood Park","",667],["Madejski Stadium","Madejski|Reading Stadium|Select Car Leasing Stadium",664],["Kirklees Stadium","Accu Stadium|John Smith's Stadium|John Smiths|McAlpine|McAlpine Stadium",659],["Valley Parade","",655],["Carrow Road","",604],["DW Stadium","Brick Community Stadium|DW|JJB|JJB Stadium|Robin Park",602],["Bloomfield Road","",439],["Roker Park","",406],["Boundary Park","",371],["Oakwell","",329],["Baseball Ground","",322],["Ayresome Park","",314],["Filbert Street","",314],["Highfield Road","",311],["The Valley","",279],["Burnden Park","",247],["County Ground","",238],["The Dell","",238]]},{"id":"goalseason","q":"Name a player who won Premier League Goal of the Season","tag":"Goals","kind":"person","gem":"Shaun Bartlett","a":[["David Beckham","",50635],["Mohamed Salah","",34611],["Wayne Rooney","",30494],["Thierry Henry","Thierry|Titi",24602],["Son Heung-min","",17788],["Dele Alli","",15292],["Robin van Persie","RVP",12369],["Alejandro Garnacho","",7345],["Jack Wilshere","",6555],["Emmanuel Adebayor","",6522],["Dennis Bergkamp","",6199],["Emre Can","",5462],["Matt Le Tissier","Le God",3545],["Andros Townsend","",3366],["Omar Marmoush","",3123],["Paolo Di Canio","",2945],["Papiss Cissé","",2257],["Erik Lamela","",2165],["Sofiane Boufal","",1673],["Glen Johnson","",1581],["Dietmar Hamann","",1511],["Julio Enciso","",1370],["Tony Yeboah","",1064],["Dalian Atkinson","",983],["Patrik Berger","",792],["Maynor Figueroa","",680],["Harrison Reed","",671],["Muzzy Izzet","",579],["Rod Wallace","",371],["Shaun Bartlett","",285],["Matthew Taylor","",162]]},{"id":"potm","q":"Name a Premier League Player of the Month winner","tag":"Awards","kind":"person","gem":"Adam Le Fondre","a":[["Cristiano Ronaldo","CR7",169605],["David Beckham","",50635],["Zlatan Ibrahimović","Zlatan",50445],["Erling Haaland","Erling",43536],["Harry Kane","",42016],["Mohamed Salah","",34611],["Wayne Rooney","",30494],["Romelu Lukaku","",26222],["Luis Suárez","",25678],["Gareth Bale","",25050],["Thierry Henry","Thierry|Titi",24602],["Marcus Rashford","",22305],["Jamie Vardy","",21294],["Eden Hazard","",21263],["Raheem Sterling","",19283],["Sergio Agüero","Kun Aguero",18450],["Pierre-Emerick Aubameyang","",18225],["Frank Lampard","",17926],["Son Heung-min","",17788],["Sadio Mané","",17511],["Steven Gerrard","",15899],["Olivier Giroud","",15896],["Dele Alli","",15292],["Virgil van Dijk","VVD|Virgil",15221],["Fernando Torres","",14727],["Michael Owen","",14011],["Jack Grealish","",14000],["Diogo Jota","",13815],["Bukayo Saka","",12690],["Roy Keane","",12661],["Harry Maguire","",12489],["Jesse Lingard","",12464],["Robin van Persie","RVP",12369],["Alan Shearer","",12252],["David de Gea","",12151],["Anthony Martial","",11911],["Gareth Southgate","",11797],["Cesc Fàbregas","",11797],["Ryan Giggs","",11749],["Diego Costa","",11493],["Ian Wright","",11330],["Martin Ødegaard","",10269],["Trent Alexander-Arnold","TAA|Trent",10110],["Carlos Tevez","",10054],["Arjen Robben","",10021],["Ruud van Nistelrooy","RVN",9887],["Alexis Mac Allister","",9866],["Eric Cantona","",9864],["Micah Richards","",9551],["Daniel Sturridge","",9482],["John Terry","",9443],["Rio Ferdinand","",9360],["Leroy Sané","",9259],["Cole Palmer","",9132],["Alexander Isak","",9093],["İlkay Gündoğan","",8822],["Juan Mata","",8753],["Edin Džeko","",8654],["Bruno Fernandes","",8465],["Aaron Ramsey","",8229],["David Luiz","",8088],["Nicolas Anelka","",7920],["Robbie Keane","",7821],["Jermain Defoe","",7804],["Wilfried Zaha","",7783],["David Silva","",7722],["Paul Scholes","",7679],["Ashley Young","",7289],["Petr Čech","",7180],["Dimitar Berbatov","",6891],["Dennis Bergkamp","",6199],["Rasmus Højlund","",6130],["Jürgen Klinsmann","",6044],["Adam Johnson","",6010],["Gylfi Sigurðsson","",5853],["Dominic Solanke","",5786],["Dwight Yorke","",5743],["James Maddison","",5610],["Joe Cole","",5440],["Marouane Fellaini","",5382],["Robbie Fowler","",5369],["Jay-Jay Okocha","",5332],["Samir Nasri","",5326],["Andy Cole","",5272],["Chris Wood","",5267],["Christian Benteke","",5080],["Scott Parker","",5031],["Michail Antonio","",4916],["Dominic Calvert-Lewin","",4831],["Teddy Sheringham","",4754],["Kelechi Iheanacho","",4749],["Odion Ighalo","",4744],["Steve McManaman","",4661],["José Antonio Reyes","",4579],["Lucas Moura","",4524],["Nemanja Vidić","",4481],["Paul Ince","",4264],["Dion Dublin","",4229],["David Ginola","",4214],["Justin Kluivert","",4178],["Bryan Mbeumo","",4128],["Joël Matip","",4052],["Duncan Ferguson","",4051],["David Seaman","",3926],["Gianfranco Zola","",3893],["Paul Merson","",3877],["Teemu Pukki","",3873],["André Ayew","",3829],["Miguel Almirón","",3711],["Antoine Semenyo","",3704],["Deco","",3681],["João Pedro","",3659],["Demba Ba","",3610],["Jan Vertonghen","",3576],["Matt Le Tissier","Le God",3545],["Rafael van der Vaart","",3538],["Andrey Arshavin","Andrei Arshavin",3390],["Jimmy Bullard","",3285],["Charlie Austin","",3278],["Louis Saha","",3124],["Alan Smith","",3114],["Darren Bent","",3001],["Juan Sebastián Verón","",2940],["Morgan Gibbs-White","",2801],["Graziano Pellè","",2741],["Stuart Pearce","",2739],["Chris Sutton","",2718],["Fraser Forster","",2703],["Freddie Ljungberg","",2680],["Gabriel Agbonlahor","",2561],["Emmanuel Petit","",2449],["Steven Fletcher","",2412],["Kevin Phillips","",2400],["Joe Willock","",2186],["Florent Malouda","",2185],["Danny Murphy","",2165],["Robert Pires","",2156],["Phil Jagielka","",2154],["Mark Schwarzer","",2141],["Tim Krul","",2141],["Kevin Campbell","",2114],["Juninho Paulista","Juninho",2083],["Roque Santa Cruz","",2079],["Anton Ferdinand","",1963],["Stan Collymore","",1951],["Kevin Nolan","",1902],["Pascal Groß","",1821],["Peter Odemwingie","",1815],["Chris Waddle","",1768],["Sami Hyypiä","",1698],["Gary McAllister","",1623],["Andrei Kanchelskis","",1584],["Connor Wickham","",1545],["Ray Parlour","",1542],["Igor Thiago","",1503],["Ledley King","",1458],["Paul Robinson","",1300],["Sylvain Wiltord","",1182],["Alex Manninger","",1171],["Edu","",1170],["James Beattie","",1121],["Tony Yeboah","",1064],["Trevor Sinclair","",1051],["Nikica Jelavić","",1045],["Kevin Davies","",837],["Marcus Bent","",797],["Patrik Berger","",792],["Paulo Wanchope","",758],["Rob Lee","",745],["Diafra Sakho","",733],["Robbie Earle","",697],["Rodrigo Muniz","",692],["Andrew Johnson","",668],["Tim Flowers","",642],["Mikael Forssell","",586],["Muzzy Izzet","",579],["Johan Elmander","",568],["Adam Le Fondre","",542],["Mickey Evans","",53]]},{"id":"motm","q":"Name a Premier League Manager of the Month winner","tag":"Managers","kind":"person","gem":"Dave Merrington","a":[["José Mourinho","Jose|The Special One",31645],["Pep Guardiola","Pep",28780],["Jürgen Klopp","Kloppo",22111],["Carlo Ancelotti","",19665],["Frank Lampard","",17926],["Alex Ferguson","Fergie|Sir Alex|Sir Alex Fergie|Sir Alex Ferguson",17645],["Mikel Arteta","",15081],["Thomas Tuchel","",13726],["Mauricio Pochettino","",13329],["Ole Gunnar Solskjær","",12591],["Antonio Conte","",11972],["Arsène Wenger","Arsene",11804],["Gareth Southgate","",11797],["Unai Emery","",10108],["Erik ten Hag","",9356],["Rafael Benítez","",8121],["Michael Carrick","",8098],["Claudio Ranieri","",7962],["Ronald Koeman","",7790],["Ange Postecoglou","",7733],["David Moyes","",7726],["Kevin Keegan","",7717],["Brendan Rodgers","",7100],["Kenny Dalglish","King Kenny",7052],["Roy Hodgson","",6946],["Harry Redknapp","Arry",6784],["Sam Allardyce","Big Sam",6661],["Nuno Espírito Santo","",6540],["Roberto Mancini","",6444],["Roberto Martínez","",6201],["Eddie Howe","",6014],["Arne Slot","",5658],["Graeme Souness","",5460],["Steve Bruce","",5458],["Enzo Maresca","",5421],["Sven-Göran Eriksson","",5356],["Mark Hughes","",5301],["Manuel Pellegrini","",4768],["Sean Dyche","",4710],["André Villas-Boas","",4312],["Bobby Robson","Sir Bobby Robson",4212],["Glenn Hoddle","",3943],["Martin O'Neill","",3908],["Andoni Iraola","",3618],["Roberto Di Matteo","",3349],["Bryan Robson","",3304],["Terry Venables","",3164],["Ruben Amorim","",3040],["Stuart Pearce","",2739],["Alan Pardew","",2613],["Oliver Glasner","",2580],["Chris Hughton","",2572],["Dean Smith","",2327],["David Wagner","",2319],["Tony Pulis","",2303],["Trevor Francis","",2230],["Ralph Hasenhüttl","",2187],["Steve Clarke","",2144],["Nigel Pearson","",2104],["Ron Atkinson","",1931],["Gordon Strachan","",1879],["Gérard Houllier","",1857],["Fabian Hürzeler","",1670],["Garry Monk","",1651],["Avram Grant","",1637],["Darren Moore","",1618],["Quique Sánchez Flores","",1590],["Javi Gracia","",1507],["David O'Leary","",1493],["Bruno Lage","",1431],["Mike Phelan","",1410],["Vítor Pereira","",1345],["Alan Ball","Alan Ball Jr.",1307],["Brian Kidd","",1293],["Paul Clement","",1274],["Steve Coppell","",1250],["Owen Coyle","",1220],["Walter Smith","",1214],["Alex McLeish","",1205],["Peter Reid","",1204],["Martin Jol","",961],["Howard Kendall","",941],["Glenn Roeder","",891],["Phil Brown","",825],["Phil Thompson","",819],["Joe Kinnear","",758],["Alan Curbishley","",750],["Howard Wilkinson","",657],["Peter Taylor","",650],["John Gregory","",632],["Roy Evans","",631],["Paul Jewell","",610],["Joe Royle","",592],["David Pleat","",553],["Sergej Jakirović","",551],["George Graham","",544],["George Burley","",526],["Gary Megson","",502],["Brian McDermott","",451],["Jim Smith","",400],["Gerry Francis","",387],["Frank Clark","",326],["Mike Jackson","",319],["Danny Wilson","",315],["Mike Walker","",229],["Brian Little","",210],["Dave Merrington","",36]]}];
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ø/g,"o").replace(/ð/g,"d").replace(/ß/g,"ss").replace(/ı/g,"i").toLowerCase()
+  .replace(/&/g,"and").replace(/^the\s+/,"").replace(/\bf\.?c\.?$|\ba\.?f\.?c\.?$/,"").replace(/[^a-z0-9]/g,"");
+function lev(a,b){
+  if(a===b) return 0;
+  const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  let prev=Array.from({length:n+1},(_,i)=>i);
+  for(let i=1;i<=m;i++){const cur=[i];for(let j=1;j<=n;j++) cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur;}
+  return prev[n];
+}
+const PARTICLES = new Set(["van","von","de","der","den","da","di","dos","das","du","le","la","ten","mac","st"]);
+/* Short forms people actually type: surnames, club nicknames. Ambiguous ones are dropped per prompt. */
+function autoAliases(name, kind){
+  const out=new Set(); const clean=name.replace(/\s*\(.*\)$/,"");
+  const w=clean.split(/\s+/);
+  if(kind==="person" && w.length>1){
+    let i=w.length-1; while(i>0 && PARTICLES.has(w[i-1].toLowerCase())) i--;
+    out.add(w.slice(i).join(" "));                       // surname, keeping "van Persie", "De Bruyne"
+    if(i<w.length-1) out.add(w[w.length-1]);             // "Persie" style is rare; keep last word too
+    if(/-/.test(w[1]||"") && w.length===2) out.add(w[0]); // "Son Heung-min" -> "Son"
+  }
+  if(kind==="club" && w.length>1){
+    out.add(w[0]);                                       // "Leeds", "Coventry"
+    out.add(clean.replace(/\s+(City|United|Town|Rovers|Wanderers|Athletic|Albion|Hotspur|County|Park Rangers|Hove Albion)$/,""));
+  }
+  if(kind==="ground"){ out.add(clean.replace(/\s+(Stadium|Park|Ground|Road)$/,"")); }
+  return [...out];
+}
+const CACHE = {};
+function entries(p){
+  if(CACHE[p.id]) return CACHE[p.id];
+  const list=p.a.filter(x=>x[0]!==p.gem);
+  const n=list.length, cut=[Math.ceil(n*.25),Math.ceil(n*.5),Math.ceil(n*.75)];
+  const out=list.map((x,i)=>({name:x[0],views:x[2],tier:i<cut[0]?0:i<cut[1]?1:i<cut[2]?2:3,extra:x[1]?x[1].split("|"):[]}));
+  const g=p.a.find(x=>x[0]===p.gem);
+  out.push({name:g[0],views:g[2],tier:4,extra:g[1]?g[1].split("|"):[]});
+  // keys: full name + listed aliases always; auto short forms only when unique in this prompt
+  const autoCount={}; const autos=out.map(e=>autoAliases(e.name,p.kind).map(norm).filter(k=>k.length>=3));
+  autos.forEach(a=>new Set(a).forEach(k=>autoCount[k]=(autoCount[k]||0)+1));
+  const fullKeys=new Set(out.map(e=>norm(e.name)));
+  out.amb=new Set(Object.keys(autoCount).filter(k=>autoCount[k]>1&&!fullKeys.has(k)));
+  out.forEach((e,i)=>{ e.keys=[...new Set([norm(e.name.replace(/\s*\(.*\)$/,"")),...e.extra.map(norm),...autos[i].filter(k=>autoCount[k]===1&&!fullKeys.has(k)||norm(e.name)===k)])].filter(Boolean); });
+  return CACHE[p.id]=out;
+}
+function match(p,guess){
+  const g=norm(guess); if(!g) return null;
+  const list=entries(p);
+  for(const e of list) if(e.keys.includes(g)) return e;
+  const thr = g.length<=4?0 : g.length<=7?1 : 2;
+  let best=null,bd=99;
+  for(const e of list) for(const k of e.keys){ if(k.length<5) continue; const d=lev(g,k); if(d<bd){bd=d;best=e;} }
+  return bd<=thr?best:null;
+}
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function pick(seed){
+  const r=mulberry(seed), arr=BANK.map(b=>b.id);
+  for(let i=arr.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+  return arr.slice(0,ROUNDS);
+}
+const byId = id => BANK.find(b=>b.id===id);
+const fmtViews = k => k>=1000 ? (k/1000).toFixed(k>=10000?0:1)+"M" : k+"k";
+
+/* Everyone shares one clock, so the daily changes at the same moment worldwide. */
+const OP_TIMEZONE = "Australia/Sydney";   // new daily at midnight in this timezone
+function opClock(){
+  const parts={}; new Intl.DateTimeFormat("en-GB",{timeZone:OP_TIMEZONE,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"})
+    .formatToParts(new Date()).forEach(p=>parts[p.type]=+p.value);
+  return parts;
+}
+function todayNum(){const c=opClock();return Math.round((Date.UTC(c.year,c.month-1,c.day)-Date.UTC(2026,9,29))/864e5)+1;}
+function opDateLabel(){const c=opClock();return new Date(Date.UTC(c.year,c.month-1,c.day)).toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"});}
+const store = {
+  get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+};
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const rand = a => a[Math.floor(Math.random()*a.length)];
+
+/* ---------- state ---------- */
+let S, phase = "lobby"; // lobby | countdown | live | result | aar
+function freshState(mode){
+  const day=todayNum();
+  const seed = mode==="daily" ? day*9973+17 : Math.floor(Math.random()*1e9);
+  return {mode, day, ids:pick(seed), round:0, kills:0, streak:0, best:0, results:[], feed:[], done:false, roundOver:false};
+}
+function save(){ if(S.mode==="daily") store.set(KEY+S.day,S); }
+function loadDaily(){ return store.get(KEY+todayNum()) || freshState("daily"); }
+
+function start(data){
+  S = (data && data.S) || loadDaily();
+  buildStatic();
+  phase = S.done ? "aar" : (data && data.S && S.roundOver) ? "result" : "lobby";
+  render();
+}
+
+/* ---------- static UI ---------- */
+function buildStatic(){
+  const rules = RULES.map(r=>`<li>${r}</li>`).join("");
+  $("rulesList").innerHTML = rules; $("helpRules").innerHTML = rules;
+  $("tierTable").innerHTML = TIERS.map(t=>`<div class="trow" style="--c:${t.color}"><span class="tn">${t.name}</span><span class="tk">+${t.kills}</span><span class="td">${t.desc}</span></div>`).join("")
+    + `<div class="trow" style="--c:var(--danger)"><span class="tn">Full time</span><span class="tk">0</span><span class="td">Out of time. Unbeaten run resets.</span></div>`;
+  $("notches").innerHTML = REWARDS.map((r,i)=>`<div class="notch${i===REWARDS.length-1?" last":""}${i%2?" alt":""}" data-at="${r.at}" style="left:${r.at/25*100}%"><span class="n">${r.at}</span><span class="name">${r.short}</span></div>`).join("");
+}
+
+/* ---------- render ---------- */
+function render(){
+  $("modeDaily").classList.toggle("on",S.mode==="daily");
+  $("modeFfa").classList.toggle("on",S.mode==="ffa");
+  $("dayTag").textContent = S.mode==="daily" ? `Daily #${S.day} · Premier League deep cuts` : "Kickabout · random prompts";
+  $("lobby").hidden = phase!=="lobby";
+  $("game").hidden = phase==="lobby";
+  if(phase==="lobby") return renderLobby();
+  renderHud();
+  if(phase==="aar"){ $("playArea").hidden=true; renderAAR(); return; }
+  $("playArea").hidden=false; $("aar").hidden=true;
+  renderRound();
+}
+
+function renderLobby(){
+  const started = S.results.length>0 || S.round>0;
+  $("lobbyEyebrow").textContent = S.mode==="daily" ? `Daily #${S.day} · ${opDateLabel()}` : "Kickabout · random prompts, play as often as you like";
+  $("deployBtn").textContent = started ? `Resume · Round ${S.round+1}` : "Kick off";
+  $("lobbyFfa").hidden = S.mode!=="daily";
+  const st = store.get("tb-stats");
+  $("lobbyStats").innerHTML = st && st.played ? `<span>Played <b>${st.played}</b></span><span>Best <b>${st.best} goals</b></span><span>Invincibles <b>${st.nukes}</b></span>` : "";
+}
+
+function renderHud(){
+  $("roundV").textContent = `${Math.min(S.round+1,ROUNDS)}/${ROUNDS}`;
+  $("killsV").textContent = S.kills;
+  $("streakV").textContent = S.streak;
+  $("bestV").textContent = S.best;
+  $("fill").style.width = Math.min(S.streak,25)/25*100+"%";
+  $("fill").classList.toggle("inv",S.streak>=25);
+  document.querySelectorAll(".notch").forEach(n=>n.classList.toggle("hit",S.streak>=+n.dataset.at));
+  $("feed").innerHTML = S.feed.length ? S.feed.slice().reverse().map(f=>
+    f.reward ? `<li class="reward"><span class="w">★ ${f.reward}</span></li>`
+             : `<li style="border-left-color:${f.color}"><span class="r">R${f.r}</span><span class="w">${esc(f.text)}</span><span class="g" style="color:${f.color}">${f.kills?"+"+f.kills:"✕"}</span></li>`
+  ).join("") : `<li class="empty">No shots yet. Your answers land here.</li>`;
+}
+
+function renderRound(){
+  const p = byId(S.ids[S.round]);
+  $("roundLbl").textContent = `Round ${S.round+1} of ${ROUNDS}`;
+  $("chips").innerHTML = `<span class="chip">${p.tag}</span>`;
+  $("prompt").textContent = p.q;
+  $("meta").textContent = `${entries(p).length} valid answers · one is top bins`;
+  const res = phase==="result";
+  $("inputzone").hidden = res; $("fbRow").hidden = res;
+  const live = phase==="live";
+  $("guess").disabled = !live; $("fireBtn").disabled = !live; $("giveUp").hidden = !live;
+  $("cdOv").hidden = phase!=="countdown";
+  if(res) renderResult(p); else { $("result").hidden=true; $("result").innerHTML=""; if(!live && tEnd===null) drawTimer(tPaused!=null?tPaused/1000:TIME); }
+}
+
+function renderResult(p){
+  const res = S.results[S.round];
+  const kia = res.tier===null;
+  const tier = kia ? KIA : TIERS[res.tier];
+  const nextR = REWARDS.find(r=>S.streak<r.at);
+  const hit = kia ? null : entries(p).find(e=>e.name===res.answer);
+  const meter = TIERS.map((t,i)=>`<div class="step${!kia&&i===res.tier?" on":""}" style="--c:${t.color}"><span class="sn">${t.name}</span><span class="sk">+${t.kills}</span></div>`).join("");
+  const last = S.round===ROUNDS-1;
+  $("result").innerHTML = `
+    <div class="score${kia?" kia":""}" style="--c:${tier.color}">
+      ${!kia && res.fresh ? `<div class="ball" aria-hidden="true"></div>`:""}
+      <div class="stamp">${kia?"Full time":tier.name}</div>
+      <div class="your">${kia?esc(res.why||"Out of time"):`“${esc(res.answer)}”`}</div>
+      <div class="pts">${kia?"0 goals · unbeaten run over":`<b>+${tier.kills} ${tier.kills===1?"goal":"goals"}</b> · unbeaten run ${S.streak}`}</div>
+      ${hit?`<div class="views">${fmtViews(hit.views)} Wikipedia reads since 2015</div>`:""}
+      <p class="quip">${esc(res.quip||"")}</p>
+      ${kia?"":`<div class="meter" aria-label="Rarity scale">${meter}</div>`}
+      <div class="score-foot">
+        <span>Total <b>${S.kills}</b></span>
+        ${res.earned?`<span class="earned">★ ${res.earned}</span>`:""}
+        <span>${nextR?`Next: ${nextR.name} at ${nextR.at}`:"Invincible"}</span>
+      </div>
+    </div>
+    <button class="next" id="nextBtn" type="button">${last?"Full-time report":"Next round"} ▸</button>`;
+  res.fresh=false;
+  $("result").hidden=false;
+  $("nextBtn").onclick = next;
+  $("nextBtn").focus({preventScroll:true});
+  $("play").scrollIntoView({block:"nearest",behavior:"smooth"});
+}
+
+function renderAAR(){
+  const top = REWARDS.filter(r=>S.best>=r.at).pop();
+  const emo = S.results.map(r=>r.tier===null?KIA.emoji:TIERS[r.tier].emoji).join("");
+  const rank = S.kills>=28?"Ballon d'Or":S.kills>=21?"Champions League":S.kills>=14?"Premier League":S.kills>=8?"Championship":"Sunday League";
+  const share = `TOP BINS ${S.mode==="daily"?"#"+S.day:"Kickabout"} — ${S.kills} goals\n${emo}\nBest unbeaten run: ${S.best}${top?" ("+top.name+")":""}`;
+  let statsHtml="";
+  if(S.mode==="daily"){
+    const st = store.get("tb-stats")||{played:0,nukes:0,best:0,total:0};
+    statsHtml = `<div><span class="eyebrow">Played</span><span class="v">${st.played}</span></div>
+      <div><span class="eyebrow">Avg goals</span><span class="v">${st.played?(st.total/st.played).toFixed(1):"0"}</span></div>
+      <div><span class="eyebrow">Best</span><span class="v">${st.best}</span></div>
+      <div><span class="eyebrow">Invincibles</span><span class="v">${st.nukes}</span></div>`;
+  }
+  $("aar").innerHTML = `
+    <div><h2>Full-time report</h2><p class="rank">Level: ${rank}</p></div>
+    <div class="aarstats">
+      <div><span class="eyebrow">Goals</span><span class="v">${S.kills}</span></div>
+      <div><span class="eyebrow">Best run</span><span class="v">${S.best}</span></div>
+      <div><span class="eyebrow">Top award</span><span class="v sm">${top?top.name:"None"}</span></div>
+      <div><span class="eyebrow">Top bins</span><span class="v">${S.results.filter(r=>r.tier===4).length}</span></div>
+    </div>
+    <div class="emojirow" aria-label="Round results">${emo}</div>
+    <h3 class="eyebrow" style="margin:0">Scouting report · tap a round to see every answer</h3>
+    <div class="rounds">${S.results.map((r,i)=>{const p=byId(S.ids[i]);const t=r.tier===null?KIA:TIERS[r.tier];
+      return `<details class="round" style="--c:${t.color}"><summary class="row"><span class="t" style="color:var(--muted)">R${i+1}</span>
+      <div><div class="q">${esc(p.q)}</div><div class="a">${r.answer?esc(r.answer):"—"}</div></div>
+      <span class="t" style="color:${t.color}">${t.name} ${t.kills?"+"+t.kills:""}</span><span class="chev" aria-hidden="true">▾</span></summary>
+      ${intelFor(p,r.answer)}</details>`;}).join("")}</div>
+    ${statsHtml?`<div class="aarstats">${statsHtml}</div>`:""}
+    <textarea class="share-text" id="shareText" rows="4" readonly aria-label="Share text">${share}</textarea>
+    <div class="actions">
+      <button class="primary" id="copyBtn" type="button">Copy result</button>
+      ${S.mode==="daily"?`<button class="ghost" id="ffaBtn" type="button">Play a kickabout</button><span class="countdown" id="countdown"></span>`
+                        :`<button class="ghost" id="againBtn" type="button">New kickabout</button>`}
+    </div>`;
+  $("aar").hidden=false;
+  $("copyBtn").onclick = ()=>{
+    const ta=$("shareText");
+    const fallback=()=>{ta.select();toast("Select and copy the text above");};
+    try{ navigator.clipboard.writeText(share).then(()=>toast("Copied"),fallback); }catch(e){ fallback(); }
+  };
+  if($("ffaBtn")) $("ffaBtn").onclick=()=>switchMode("ffa");
+  if($("againBtn")) $("againBtn").onclick=()=>switchMode("ffa");
+  tickCountdown();
+}
+function intelFor(p,mine){
+  const list=entries(p);
+  return `<div class="intel">${[4,3,2,1,0].map(ti=>{
+    const items=list.filter(e=>e.tier===ti);
+    if(!items.length) return "";
+    const t=TIERS[ti];
+    return `<div class="tierrow" style="--c:${t.color}"><span class="lbl">${t.name} +${t.kills}</span>
+      <div class="ans">${items.map(e=>`<span class="${e.name===mine?"mine":""}">${esc(e.name.replace(/\s*\(.*\)$/,""))}<i>${fmtViews(e.views)}</i></span>`).join("")}</div></div>`;
+  }).join("")}<p class="src">Numbers are Wikipedia page reads since July 2015.</p></div>`;
+}
+let cdTimer;
+function tickCountdown(){
+  clearInterval(cdTimer);
+  const el=$("countdown"); if(!el) return;
+  const upd=()=>{const c=opClock();const s=Math.max(0,86400-(c.hour*3600+c.minute*60+c.second));
+    el.textContent=`Next daily in ${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor(s/60)%60).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;};
+  upd(); cdTimer=setInterval(upd,1000);
+}
+
+/* ---------- countdown + clock ---------- */
+let cdHandle=null, tEnd=null, tPaused=null, raf=0;
+function beginRound(){
+  clearTimeout(cdHandle); stopTimer(); tPaused=null;
+  phase="countdown"; $("feedback").textContent=""; $("guess").value="";
+  render();
+  let n=3;
+  const show=()=>{const el=$("cdNum");el.textContent=n;el.classList.remove("tick");void el.offsetWidth;el.classList.add("tick");};
+  show();
+  const step=()=>{ n--; if(n>0){ show(); cdHandle=setTimeout(step,700); } else { goLive(); } };
+  cdHandle=setTimeout(step,700);
+}
+function goLive(){ phase="live"; render(); startTimer(); $("guess").focus({preventScroll:true}); }
+function drawTimer(left){
+  const bar=$("tbar"), num=$("tnum");
+  bar.style.width=(left/TIME*100)+"%";
+  bar.classList.toggle("warn",left<=8&&left>4); bar.classList.toggle("crit",left<=4);
+  num.textContent=left.toFixed(1); num.classList.toggle("crit",left<=4);
+}
+function startTimer(ms){ tEnd=performance.now()+(ms??TIME*1000); tPaused=null; cancelAnimationFrame(raf); loop(); }
+function stopTimer(){ tEnd=null; cancelAnimationFrame(raf); }
+function loop(){
+  if(tEnd===null) return;
+  const left=Math.max(0,(tEnd-performance.now())/1000);
+  drawTimer(left);
+  if(left<=0){ stopTimer(); timeout(); return; }
+  raf=requestAnimationFrame(loop);
+}
+function miss(val,ambiguous){
+  $("play").classList.remove("shake"); void $("play").offsetWidth; $("play").classList.add("shake");
+  $("feedback").className="feedback bad";
+  $("feedback").textContent= ambiguous ? `Offside: more than one answer is "${val}". Add a first name.` : `Wide! "${val}" isn't on the list. Keep shooting.`;
+  $("guess").select();
+}
+function timeout(){ if(phase==="live") endRound(null,null,"Out of time"); }
+
+/* ---------- actions ---------- */
+function fire(e){
+  e.preventDefault();
+  if(phase!=="live") return;
+  const val=$("guess").value.trim(); if(!val) return;
+  const hit=match(byId(S.ids[S.round]),val);
+  if(!hit){
+    if(entries(byId(S.ids[S.round])).amb.has(norm(val))) return miss(val,true);
+    return miss(val);
+  }
+  endRound(hit.tier,hit.name);
+}
+function endRound(tier,answer,why){
+  stopTimer(); tPaused=null;
+  const t = tier===null?KIA:TIERS[tier];
+  const r = {tier,answer,fresh:true,quip: tier===null ? (why==="Out of time"?"The ref's blown up. Unbeaten run over.":"Subbed off. Unbeaten run over.") : rand(t.lines), why};
+  S.results[S.round]=r; S.roundOver=true;
+  S.feed.push({r:S.round+1,text:answer?answer.replace(/\s*\(.*\)$/,""):"Full time",kills:t.kills,color:t.color});
+  if(tier===null){ S.streak=0; }
+  else{
+    const before=S.streak;
+    S.kills+=t.kills; S.streak+=t.kills; S.best=Math.max(S.best,S.streak);
+    const earned=REWARDS.filter(x=>before<x.at && S.streak>=x.at);
+    earned.forEach(x=>S.feed.push({reward:x.name}));
+    const top=earned[earned.length-1];
+    if(top){ r.earned=top.name; if(top.at===25) invincible(); else toast(top.name); }
+    ["killsV","streakV"].forEach(id=>{const el=$(id);el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump");});
+  }
+  phase="result"; save(); render();
+}
+function next(){
+  if(S.round>=ROUNDS-1){
+    S.done=true; phase="aar";
+    if(S.mode==="daily" && !S.counted){
+      const st=store.get("tb-stats")||{played:0,nukes:0,best:0,total:0};
+      st.played++; st.total+=S.kills; st.best=Math.max(st.best,S.kills); if(S.best>=25) st.nukes++;
+      store.set("tb-stats",st); S.counted=true;
+    }
+    save(); render(); window.scrollTo({top:0,behavior:"smooth"}); return;
+  }
+  S.round++; S.roundOver=false; save();
+  beginRound();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function giveUp(){ if(phase==="live") endRound(null,null,"Subbed off"); }
+function deploy(){
+  if(S.done){ phase="aar"; render(); return; }
+  if(S.roundOver){ phase="result"; render(); return; }
+  beginRound();
+}
+function switchMode(m){
+  clearTimeout(cdHandle); stopTimer(); tPaused=null; $("help").hidden=true;
+  if(m==="daily"){ S=loadDaily(); phase = S.done?"aar":"lobby"; render(); }
+  else { S=freshState("ffa"); beginRound(); }
+}
+function openHelp(){
+  if(!$("help").hidden) return closeHelp();
+  if(phase==="live" && tEnd!==null){ tPaused=tEnd-performance.now(); stopTimer(); }
+  if(phase==="countdown"){ clearTimeout(cdHandle); }
+  $("help").hidden=false;
+}
+function closeHelp(){
+  $("help").hidden=true;
+  if(phase==="live"){ startTimer(tPaused??undefined); $("guess").focus({preventScroll:true}); }
+  else if(phase==="countdown") beginRound();
+}
+
+/* ---------- fx ---------- */
+let toastT;
+function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2200);}
+function invincible(){const n=$("inv");n.hidden=false;setTimeout(()=>n.hidden=true,2600);}
+
+/* ---------- wire up ---------- */
+$("form").addEventListener("submit",fire);
+$("giveUp").onclick=giveUp;
+$("deployBtn").onclick=deploy;
+$("lobbyFfa").onclick=()=>switchMode("ffa");
+$("modeDaily").onclick=()=>switchMode("daily");
+$("modeFfa").onclick=()=>switchMode("ffa");
+$("helpBtn").onclick=openHelp;
+$("helpClose").onclick=closeHelp;
+
+window.claude?.hot?.snapshot?.(()=>({S}));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
