@@ -67,6 +67,30 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 .trow .tk{font-family:var(--display);font-weight:800;font-size:18px;color:var(--c)}
 .trow .td{font-size:14px;color:var(--muted)}
 .method{margin:8px 0 0;font-size:13px;color:var(--muted)}
+.callsign{display:flex;flex-direction:column;gap:6px;max-width:340px}
+.callsign input,.lb-join input{background:#06120b;border:2px solid var(--line);color:var(--fg);font-family:var(--body);font-size:18px;font-weight:600;padding:10px 12px}
+.callsign input:focus,.lb-join input:focus{border-color:var(--fg)}
+.callsign input.err{border-color:var(--danger)}
+.callsign-err{margin:0;color:var(--danger);font-size:14px}
+.lb{display:grid;gap:10px;border:2px solid var(--accent);padding:16px;background:#06120b}
+.lb-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.lb-head h3{margin:0;font-family:var(--display);font-weight:900;font-size:30px;line-height:1;text-transform:uppercase}
+.lb .wrap{overflow-x:auto}
+.lb table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.lb th{font-family:var(--label);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+.lb td{padding:9px 10px;border-bottom:1px solid var(--line)}
+.lb .r{text-align:right}
+.lb td.rk{font-family:var(--display);font-weight:900;font-size:24px;width:44px;color:var(--muted)}
+.lb tr.first td.rk{color:var(--accent)}
+.lb td.nm{font-weight:700}
+.lb td.g{font-family:var(--display);font-weight:800;font-size:22px;color:var(--accent)}
+.lb tr.me td{background:var(--panel-2)}
+.lb tr.me td.nm{color:var(--accent)}
+.lb td.em{font-size:15px;letter-spacing:1px;white-space:nowrap}
+.lb-note{margin:0;color:var(--muted);font-size:14px}
+.lb-join{display:flex;gap:8px;flex-wrap:wrap}
+.lb-join input{flex:1;min-width:0;max-width:260px}
+@media (max-width:520px){.lb .em{display:none}}
 .lobbystats{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--label);font-size:15px;color:var(--muted);letter-spacing:.04em}
 .lobbystats b{color:var(--fg);font-weight:700}
 
@@ -247,6 +271,11 @@ footer a{color:var(--muted)}
       <h2>Skip the tap-ins. Aim for the corners.</h2>
       <p class="lede">Seven Premier League prompts. Twenty seconds each. The less famous your answer, the more goals it's worth.</p>
       <ul class="rules" id="rulesList"></ul>
+      <div class="callsign" id="callsignBox">
+        <label for="callsign" class="eyebrow">Your name for today's leaderboard</label>
+        <input id="callsign" type="text" maxlength="16" placeholder="e.g. Mick" autocomplete="nickname" spellcheck="false">
+        <p class="callsign-err" id="callsignErr" hidden>Put your name in first so your score lands on the leaderboard.</p>
+      </div>
       <div class="lobby-actions">
         <button class="deploy" id="deployBtn" type="button">Kick off</button>
         <button class="ghost" id="lobbyFfa" type="button">Kickabout instead</button>
@@ -334,6 +363,15 @@ const REWARDS = [
   {at:11, name:"Player of the Month", short:"POTM"}, {at:15, name:"Golden Boot", short:"Golden Boot"}, {at:25, name:"Invincible", short:"Invincible"}
 ];
 const ROUNDS = 7, TIME = 20, KEY = "tb-daily-";
+
+/* ---------- leaderboard (Supabase) ----------
+   Paste your Supabase Project URL and publishable (anon) key between the quotes.
+   The publishable key is meant to sit in web pages. Never put the secret / service_role key here.
+   Leave them empty and the game still works, just without a leaderboard. */
+const LEADERBOARD = {
+  url: "https://rrqfouckfnhhiyhpfmvu.supabase.co",
+  key: "sb_publishable_dPPwrQSgm7WjZhfr2pm1RQ_103D4EF8"    // e.g. "sb_publishable_..." or the long "anon public" key
+};
 const RULES = [
   "Seven prompts a day, the same for everyone. Give one answer per prompt.",
   "You get 20 seconds and unlimited shots. Wrong answers cost nothing but time.",
@@ -470,6 +508,9 @@ function renderLobby(){
   $("lobbyEyebrow").textContent = S.mode==="daily" ? `Daily #${S.day} · ${opDateLabel()}` : "Kickabout · random prompts, play as often as you like";
   $("deployBtn").textContent = started ? `Resume · Round ${S.round+1}` : "Kick off";
   $("lobbyFfa").hidden = S.mode!=="daily";
+  $("callsignBox").hidden = S.mode!=="daily" || !boardOn();
+  if(!$("callsign").value) $("callsign").value = S.name || store.get("tb-name") || "";
+  $("callsignErr").hidden = true; $("callsign").classList.remove("err");
   const st = store.get("tb-stats");
   $("lobbyStats").innerHTML = st && st.played ? `<span>Played <b>${st.played}</b></span><span>Best <b>${st.best} goals</b></span><span>Invincibles <b>${st.nukes}</b></span>` : "";
 }
@@ -555,6 +596,7 @@ function renderAAR(){
       <div><span class="eyebrow">Top bins</span><span class="v">${S.results.filter(r=>r.tier===4).length}</span></div>
     </div>
     <div class="emojirow" aria-label="Round results">${emo}</div>
+    ${S.mode==="daily"&&boardOn()?`<section class="lb" id="lb" aria-live="polite"></section>`:""}
     <h3 class="eyebrow" style="margin:0">Scouting report · tap a round to see every answer</h3>
     <div class="rounds">${S.results.map((r,i)=>{const p=byId(S.ids[i]);const t=r.tier===null?KIA:TIERS[r.tier];
       return `<details class="round" style="--c:${t.color}"><summary class="row"><span class="t" style="color:var(--muted)">R${i+1}</span>
@@ -577,6 +619,51 @@ function renderAAR(){
   if($("ffaBtn")) $("ffaBtn").onclick=()=>switchMode("ffa");
   if($("againBtn")) $("againBtn").onclick=()=>switchMode("ffa");
   tickCountdown();
+  if(S.mode==="daily" && boardOn()) syncBoard();
+}
+
+/* ---------- leaderboard ---------- */
+const boardOn = () => !!(LEADERBOARD.url && LEADERBOARD.key);
+function playerId(){
+  let id=store.get("tb-player");
+  if(!id){ id=(crypto.randomUUID?crypto.randomUUID():"p-"+Math.random().toString(36).slice(2)+Date.now().toString(36)); store.set("tb-player",id); }
+  return id;
+}
+async function sb(path,opts={}){
+  const res=await fetch(LEADERBOARD.url.replace(/\/$/,"")+"/rest/v1/"+path,{...opts,headers:{apikey:LEADERBOARD.key,Authorization:"Bearer "+LEADERBOARD.key,"Content-Type":"application/json",...(opts.headers||{})}});
+  if(res.status===409) return null;            // already submitted today
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  return res.status===201||res.status===204 ? null : res.json();
+}
+async function syncBoard(){
+  const box=$("lb"); if(!box) return;
+  const head=`<div class="lb-head"><h3>Today's table</h3><button class="ghost" id="lbRefresh" type="button">Refresh</button></div>`;
+  if(!S.name){
+    box.innerHTML=head+`<p class="lb-note">Add your name to put today's score on the table.</p>
+      <form class="lb-join" id="lbJoin"><input id="lbName" maxlength="16" placeholder="Your name" value="${esc(store.get("tb-name")||"")}" aria-label="Your name"><button class="primary" type="submit">Add my score</button></form>`;
+    $("lbJoin").onsubmit=e=>{e.preventDefault();const nm=$("lbName").value.trim().replace(/\s+/g," ").slice(0,16);if(!nm)return;S.name=nm;store.set("tb-name",nm);save();syncBoard();};
+    $("lbRefresh").onclick=syncBoard; return;
+  }
+  box.innerHTML=head+`<p class="lb-note">Loading the table…</p>`;
+  $("lbRefresh").onclick=syncBoard;
+  try{
+    if(!S.submitted){
+      const emo=S.results.map(r=>r.tier===null?KIA.emoji:TIERS[r.tier].emoji).join("");
+      await sb("scores",{method:"POST",headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({day:S.day,player:playerId(),name:S.name,goals:S.kills,best:S.best,emoji:emo})});
+      S.submitted=true; save();
+    }
+    const rows=await sb(`scores?day=eq.${S.day}&select=player,name,goals,best,emoji&order=goals.desc,best.desc,created_at.asc`);
+    const me=playerId();
+    const body=rows.map((r,i)=>{const rank=i+1;
+      return `<tr class="${r.player===me?"me":""}${rank===1?" first":""}"><td class="rk">${rank}</td><td class="nm">${esc(r.name)}${r.player===me?" (you)":""}</td>
+        <td class="g r">${r.goals}</td><td class="r">${r.best}</td><td class="em">${esc(r.emoji||"")}</td></tr>`;}).join("");
+    box.innerHTML=head+`<div class="wrap"><table><thead><tr><th>#</th><th>Name</th><th class="r">Goals</th><th class="r">Best run</th><th class="em">Rounds</th></tr></thead><tbody>${body}</tbody></table></div>
+      <p class="lb-note">${rows.length===1?"You're first in today. Check back once the others have played.":`${rows.length} played today. Ties go to the longer unbeaten run, then whoever finished first.`}</p>`;
+  }catch(e){
+    box.innerHTML=head+`<p class="lb-note">Couldn't reach the leaderboard. Check your connection and press Refresh.</p>`;
+  }
+  if($("lbRefresh")) $("lbRefresh").onclick=syncBoard;
 }
 function intelFor(p,mine){
   const list=entries(p);
@@ -679,6 +766,11 @@ function next(){
 }
 function giveUp(){ if(phase==="live") endRound(null,null,"Subbed off"); }
 function deploy(){
+  if(S.mode==="daily" && boardOn()){
+    const nm=$("callsign").value.trim().replace(/\s+/g," ").slice(0,16);
+    if(!nm){ $("callsignErr").hidden=false; $("callsign").classList.add("err"); $("callsign").focus(); return; }
+    S.name=nm; store.set("tb-name",nm); save();
+  }
   if(S.done){ phase="aar"; render(); return; }
   if(S.roundOver){ phase="result"; render(); return; }
   beginRound();
@@ -709,6 +801,7 @@ function invincible(){const n=$("inv");n.hidden=false;setTimeout(()=>n.hidden=tr
 $("form").addEventListener("submit",fire);
 $("giveUp").onclick=giveUp;
 $("deployBtn").onclick=deploy;
+$("callsign").addEventListener("keydown",e=>{ if(e.key==="Enter") deploy(); });
 $("lobbyFfa").onclick=()=>switchMode("ffa");
 $("modeDaily").onclick=()=>switchMode("daily");
 $("modeFfa").onclick=()=>switchMode("ffa");
