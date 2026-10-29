@@ -49,7 +49,9 @@ body.duel-on #lobby, body.duel-on #game, body.duel-on #help{display:none!importa
 .vs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .pl{background:var(--panel);border:2px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:6px;transition:border-color .25s,background .25s,opacity .25s;opacity:.6}
 .pl.on{border-color:var(--accent);background:var(--panel-2);opacity:1;box-shadow:0 0 0 3px rgba(255,210,63,.18)}
-.pl .nm{font-family:var(--display);font-weight:800;font-size:24px;text-transform:uppercase;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .ptop{display:flex;gap:8px;align-items:center;min-width:0}.pl.right .ptop{flex-direction:row-reverse}
+.pl .av{width:40px;flex:0 0 40px}
+.pl .nm{min-width:0;font-family:var(--display);font-weight:800;font-size:24px;text-transform:uppercase;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pl .nm small{font-family:var(--label);font-size:13px;color:var(--muted);letter-spacing:.08em;margin-left:6px}
 .pl .lives{display:flex;gap:5px;height:20px;flex-wrap:wrap}
 .pl .lives svg{width:20px;height:20px}
@@ -61,6 +63,16 @@ body.duel-on #lobby, body.duel-on #game, body.duel-on #help{display:none!importa
 .lane::before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:2px solid rgba(243,241,231,.35)}
 .lane::after{content:"";position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border:2px solid rgba(243,241,231,.35);border-radius:50%}
 .lane .holder{position:absolute;bottom:6px;font-family:var(--display);font-weight:900;font-size:20px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);z-index:2;transition:left .45s cubic-bezier(.3,1.2,.4,1),opacity .2s;transform:translateX(-50%);white-space:nowrap;max-width:60%;overflow:hidden;text-overflow:ellipsis}
+.dspi{position:absolute;top:50%;width:72px;margin:-34px 0 0 -36px;z-index:2}
+.dspi.r .spr{transform:scaleX(-1)}
+.avpick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:420px}
+.avpick button{background:var(--bg);border:2px solid var(--line);padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+.avpick button .spr{width:64px}
+.avpick button b{font-family:var(--label);font-weight:700;font-size:16px;letter-spacing:.06em;text-transform:uppercase}
+.avpick button small{font-size:12px;color:var(--muted);line-height:1.2}
+.avpick button.on{border-color:var(--accent);background:var(--panel-2)}
+.avpick button.on b{color:var(--accent)}
+.avpick button:not(.on) .spr .f0,.avpick button:not(.on) .spr .f1{animation-play-state:paused}
 .dball{position:absolute;top:50%;width:56px;height:56px;margin:-34px 0 0 -28px;z-index:3;transition:left .5s cubic-bezier(.3,1.1,.4,1)}
 .dball .inflate{width:100%;height:100%;transition:transform .9s linear}
 .dball svg{width:100%;height:100%;display:block;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
@@ -100,7 +112,7 @@ body.duel-on #lobby, body.duel-on #game, body.duel-on #help{display:none!importa
 @keyframes dflash{from{background:rgba(255,82,71,.45)}to{background:var(--panel)}}
 @media (max-width:560px){.pl .nm{font-size:19px}.duel .panel,.dcard{padding:14px}.lane{height:104px}}
 `;
-document.head.insertAdjacentHTML("beforeend", `<style>${css}</style>`);
+document.head.insertAdjacentHTML("beforeend", `<style>${css}${typeof SPIDERS !== "undefined" ? SPIDERS.CSS : ""}</style>`);
 const sec = document.createElement("section");
 sec.className = "duel"; sec.id = "duel"; sec.hidden = true;
 document.querySelector(".app footer").before(sec);
@@ -169,6 +181,15 @@ let peerTyping = "";
 let hb = 0, tickH = 0, rafH = 0;
 
 const myName = () => (store.get("tb-name") || "").trim();
+const HAS_SP = typeof SPIDERS !== "undefined";
+const AVS = HAS_SP ? SPIDERS.keys : [];
+const myAv = () => { const a = store.get("tb-duel-av"); return AVS.includes(a) ? a : (AVS[0] || ""); };
+const spr = (av, mood) => HAS_SP ? SPIDERS.svg(AVS.includes(av) ? av : AVS[0], mood) : "";
+function avPicker(){
+  if (!HAS_SP) return "";
+  const cur = myAv();
+  return `<span class="eyebrow">Pick your spider</span><div class="avpick">${AVS.map(k => `<button type="button" data-av="${k}" class="${k === cur ? "on" : ""}" aria-pressed="${k === cur}">${spr(k, "idle")}<b>${SPIDERS.SPECIES[k].name}</b><small>${SPIDERS.SPECIES[k].blurb}</small></button>`).join("")}</div>`;
+}
 const meIdx = () => G ? G.players.findIndex(p => p.pid === myPid) : -1;
 const promptOf = id => BANK.find(b => b.id === id);
 function loadSettings(){
@@ -246,7 +267,7 @@ function onMsg(m){
     if (m.t === "hello" && m.pid !== myPid) {
       lastPeerAt = performance.now();
       if (G.players.length < 2 && !G.players.some(p => p.pid === m.pid)) {
-        G.players.push({ pid: m.pid, name: String(m.name || "Player 2").slice(0, 16), lives: G.settings.lives });
+        G.players.push({ pid: m.pid, name: String(m.name || "Player 2").slice(0, 16), av: AVS.includes(m.av) ? m.av : AVS[0], lives: G.settings.lives });
         hostLog(`<b>${esc(G.players[1].name)}</b> joined.`);
       } else if (G.players[1] && G.players[1].pid !== m.pid) { send({ t: "full", to: m.pid }); return; }
       hostPush();
@@ -328,6 +349,7 @@ function draw(info = {}){
       <h2>Don't get caught holding it</h2>
       ${RULES_HTML}
       ${nameField()}
+      ${avPicker()}
       <div class="row"><button class="deploy" type="button" data-act="create">Create match</button></div>
       <div class="row"><input class="dname" id="dcode" maxlength="4" placeholder="Code" style="max-width:120px;text-transform:uppercase"><button class="ghost" type="button" data-act="joincode">Join</button></div>
       ${V.err ? `<p class="err">${esc(V.err)}</p>` : ""}
@@ -339,6 +361,7 @@ function draw(info = {}){
       <h2>You've been challenged</h2>
       ${RULES_HTML}
       ${nameField()}
+      ${avPicker()}
       <div class="row"><button class="deploy" type="button" data-act="join">Join match</button></div>
       ${V.err ? `<p class="err">${esc(V.err)}</p>` : ""}
       <div class="row">${back}</div></div>`;
@@ -375,9 +398,9 @@ function sideOf(i){ const me = meIdx(); return (me === 1 ? i === 1 : i === 0) ? 
 function vsHtml(){
   const me = meIdx(), order = me === 1 ? [1, 0] : [0, 1];
   const card = (i, side) => { const p = G.players[i]; if (!p) return `<div class="pl"></div>`;
-    const on = (G.phase === "live" || G.phase === "popped") && G.turn === i;
+    const on = ((G.phase === "live" || G.phase === "popped") && G.turn === i) || (G.phase === "over" && G.winner === i);
     return `<div class="pl ${side}${on ? " on" : ""}" id="pl${i}">
-      <div class="nm">${esc(p.name)}${i === me ? "<small>YOU</small>" : ""}</div>
+      <div class="ptop">${HAS_SP ? `<div class="av">${spr(p.av, G.phase === "over" ? moodOf(i) : "idle")}</div>` : ""}<div class="nm">${esc(p.name)}${i === me ? "<small>YOU</small>" : ""}</div></div>
       <div class="lives">${lifeIcons(p.lives, G.settings.lives)}</div>
       <div class="typing" id="typ${i}"></div></div>`; };
   return `<div class="vs">${card(order[0], "")}${card(order[1], "right")}</div>`;
@@ -392,6 +415,7 @@ function drawMatch(info){
     const w = G.players[G.winner];
     sec.innerHTML = vsHtml() + `<div class="dcard">
       <span class="eyebrow">Full time</span>
+      ${HAS_SP && w ? `<div style="width:120px">${spr(w.av, "win")}</div>` : ""}
       <p class="winner">${G.winner === me ? "You win" : esc(w ? w.name : "") + " wins"}</p>
       <ol class="dlog">${G.log.map(l => `<li>${l}</li>`).join("")}</ol>
       <div class="row">${G.players.length === 2 ? `<button class="deploy" type="button" data-act="${isHost ? "start" : "rematch"}">Rematch</button>` : ""}${back}</div></div>`;
@@ -402,7 +426,7 @@ function drawMatch(info){
   const myTurn = G.turn === me && G.phase === "live";
   if (!document.getElementById("dguess")) {
     sec.innerHTML = `<div id="dvs"></div>
-      <div class="lane" id="dlane"><div class="dball" id="dball">${BIGBALL}</div><div class="holder" id="dholder"></div></div>
+      <div class="lane" id="dlane"><div class="dspi" id="dsp0" style="left:11%"></div><div class="dspi r" id="dsp1" style="left:89%"></div><div class="dball" id="dball">${BIGBALL}</div><div class="holder" id="dholder"></div></div>
       <div class="dcard" id="dcard">
       <span class="eyebrow" id="dtag"></span>
       <h3 id="dq"></h3>
@@ -429,11 +453,12 @@ function drawMatch(info){
   const dq = document.getElementById("dq");
   if (dq.textContent !== (p ? p.q : "")) { dq.textContent = p ? p.q : ""; dq.classList.remove("flash"); void dq.offsetWidth; dq.classList.add("flash"); }
   // the ball
-  const side = sideOf(G.turn), x = side === 0 ? 22 : 78;
+  const side = sideOf(G.turn), x = side === 0 ? 30 : 70;
+  paintLaneSpiders();
   const ball = document.getElementById("dball"), holder = document.getElementById("dholder"), lane = document.getElementById("dlane");
   lane.querySelector(".dburst")?.remove();
   if (G.phase === "popped") {
-    const popSide = sideOf(G.last?.by ?? (1 - G.turn)), px = popSide === 0 ? 22 : 78;
+    const popSide = sideOf(G.last?.by ?? (1 - G.turn)), px = popSide === 0 ? 30 : 70;
     ball.style.visibility = "hidden";
     lane.insertAdjacentHTML("beforeend", `<div class="dburst" style="left:${px}%">${burstSvg()}</div>`);
     holder.style.opacity = 0;
@@ -457,6 +482,20 @@ function drawMatch(info){
   if (info.ev && info.ev.kind === "pop" && G.players[info.ev.by]) document.getElementById("pl" + info.ev.by)?.classList.add("flash");
   paintTyping();
   startRaf();
+}
+function moodOf(i){
+  if (G.phase === "over") return i === G.winner ? "win" : "hurt";
+  if (G.phase === "popped") return G.last && G.last.by === i ? "hurt" : "idle";
+  if (G.phase === "live" && G.turn === i) return "nervous";
+  return "idle";
+}
+function paintLaneSpiders(){
+  if (!HAS_SP) return;
+  G.players.forEach((p, i) => {
+    const el = document.getElementById("dsp" + sideOf(i)); if (!el) return;
+    const key = p.av + moodOf(i);
+    if (el.dataset.k !== key) { el.dataset.k = key; el.innerHTML = spr(p.av, moodOf(i)); }
+  });
 }
 function paintFb(){ const el = document.getElementById("dfb"); if (el) { el.textContent = fb.text; el.className = "dfb " + fb.cls; } }
 function paintTyping(){
@@ -495,6 +534,10 @@ function bindButtons(){
     store.set("tb-duel-settings", G.settings);
     hostPush();
   });
+  sec.querySelectorAll("[data-av]").forEach(b => b.onclick = () => {
+    store.set("tb-duel-av", b.dataset.av);
+    sec.querySelectorAll("[data-av]").forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", on); });
+  });
   const dn = document.getElementById("dname");
   if (dn) dn.onkeydown = e => { if (e.key === "Enter") act(V.screen === "join" ? "join" : "create"); };
   const dc = document.getElementById("dcode");
@@ -508,7 +551,7 @@ async function act(a){
     const n = readName(); if (!n) { V.err = "Put your name in first."; return draw(); }
     isHost = true; room = code4(); prevPhase = prevPrompt = prevTurn = null;
     const settings = loadSettings();
-    G = { seq: 0, phase: "lobby", settings, players: [{ pid: myPid, name: n, lives: settings.lives }], turn: 0, used: [], seen: [], log: [], promptId: null };
+    G = { seq: 0, phase: "lobby", settings, players: [{ pid: myPid, name: n, av: myAv(), lives: settings.lives }], turn: 0, used: [], seen: [], log: [], promptId: null };
     V = { screen: "connecting", err: "" }; draw();
     try { await connect(room, onMsg); } catch (e) { isHost = false; V = { screen: "home", err: e.message }; return draw(); }
     history.replaceState(null, "", shareLink());
@@ -533,7 +576,7 @@ async function act(a){
     try { await connect(room, onMsg); } catch (e) { V = { screen: "join", err: e.message }; return draw(); }
     history.replaceState(null, "", shareLink());
     lastStateAt = performance.now();
-    const hello = () => send({ t: "hello", pid: myPid, name: n });
+    const hello = () => send({ t: "hello", pid: myPid, name: n, av: myAv() });
     hello();
     clearInterval(hb); hb = setInterval(() => {
       if (!G) hello(); else send({ t: "ping", pid: myPid });
