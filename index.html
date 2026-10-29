@@ -343,6 +343,7 @@ footer a{color:var(--muted)}
       <div class="callsign" id="callsignBox">
         <label for="callsign" class="eyebrow">Your name for today's leaderboard</label>
         <input id="callsign" type="text" maxlength="16" placeholder="e.g. Mick" autocomplete="nickname" spellcheck="false">
+        <p class="method" style="margin:0">Your name, score and answers are saved so the scoring can learn what players actually say.</p>
         <p class="callsign-err" id="callsignErr" hidden>Put your name in first so your score lands on the leaderboard.</p>
       </div>
       <div class="lobby-actions">
@@ -782,7 +783,7 @@ async function syncBoard(deep){
       return `<tr class="${r.player===me?"me":""}${i===0?" first":""}"><td class="rk">${i+1}</td><td class="nm">${esc(r.name)}${r.player===me?" (you)":""}<div style="font-family:var(--label);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:${lv.color}">${lv.name}</div></td>
         <td class="g r">${r.goals}</td><td class="r">${r.best}</td><td class="em">${esc(r.emoji||"")}</td></tr>`;}).join("");
     box.innerHTML=head+`<div class="wrap"><table><thead><tr><th>#</th><th>Name</th><th class="r">Score</th><th class="r">Deep cuts</th><th class="em">Rounds</th></tr></thead><tbody>${body}</tbody></table></div>
-      <p class="lb-note">${rows.length===1?"You're first in today. Check back once the others have played.":`${rows.length} played today. Deep cuts = screamers plus top bins. Ties go to more deep cuts, then whoever finished first.`}</p>`;
+      <p class="lb-note">${rows.length===1?"You're first in today. Check back once the others have played.":`${rows.length} played today.`}</p>`;
   }catch(e){
     box.innerHTML=head+`<p class="lb-note">Couldn't reach the leaderboard. Check your connection and press Refresh.</p>`;
   }
@@ -845,16 +846,35 @@ function miss(val,ambiguous){
 function timeout(){ if(phase==="live") endRound(null,null,"Out of time"); }
 
 /* ---------- actions ---------- */
+/* Every guess is logged (when the leaderboard is on) so scoring can learn from what players actually say. */
+function elapsed(){ return tEnd===null ? TIME : Math.max(0,Math.min(TIME, TIME-(tEnd-performance.now())/1000)); }
+function logGuess(o){
+  if(!boardOn()) return;
+  const row={day:S.day,player:playerId(),name:S.name||null,round:S.round+1,prompt_id:S.ids[S.round],
+    guess:o.guess!=null?String(o.guess).slice(0,80):null,matched:o.matched||null,tier:o.tier??null,outcome:o.outcome,
+    seconds:Math.round(elapsed()*100)/100};
+  try{
+    fetch(LEADERBOARD.url.replace(/\/$/,"")+"/rest/v1/guesses",{method:"POST",keepalive:true,
+      headers:{apikey:LEADERBOARD.key,Authorization:"Bearer "+LEADERBOARD.key,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify(row)}).catch(()=>{});
+  }catch(e){}
+}
 function fire(e){
   e.preventDefault();
   if(phase!=="live") return;
   const val=$("guess").value.trim(); if(!val) return;
   const p=byId(S.ids[S.round]);
   const hit=match(p,val);
-  if(!hit){ if(entries(p).amb.has(norm(val))) return miss(val,true); return miss(val); }
+  if(!hit){
+    const amb=entries(p).amb.has(norm(val));
+    logGuess({guess:val,outcome:amb?"ambiguous":"miss"});
+    return amb ? miss(val,true) : miss(val);
+  }
+  logGuess({guess:val,matched:hit.name,tier:hit.tier,outcome:"hit"});
   endRound(hit.tier,hit.name);
 }
 function endRound(tier,answer,why){
+  if(tier===null) logGuess({outcome: why==="Subbed off" ? "subbed" : "offside"});
   stopTimer(); tPaused=null;
   const t = tier===null?OFFSIDE:TIERS[tier];
   const r = {tier,answer,fresh:true,why,quip: tier===null ? (why==="Out of time"?"Flag's up. Offside, no score.":"Subbed off. No score this round.") : rand(t.lines)};
