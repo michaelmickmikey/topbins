@@ -78,6 +78,8 @@ body.duel-on #lobby, body.duel-on #game, body.duel-on #help{display:none!importa
   background:repeating-linear-gradient(90deg,#11301f 0 40px,#0e2a1b 40px 80px)}
 .lane::before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:2px solid rgba(243,241,231,.3)}
 .lane::after{content:"";position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border:2px solid rgba(243,241,231,.3);border-radius:50%}
+.fusebar{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(0,0,0,.35);z-index:1}
+.fusebar i{display:block;height:100%;width:0;background:var(--accent)}
 .dspi{position:absolute;top:6px;width:68px;margin-left:-34px;z-index:2;transition:opacity .3s}
 .dspi.out{opacity:.3}
 .dspi .snm{display:block;text-align:center;font-family:var(--label);font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-2px}
@@ -240,8 +242,8 @@ function hostNewFuse(){     // a fresh hidden fuse every time the ball moves
 }
 function snap(){
   const now = Date.now();
-  const { fuseEnd, ...pub } = G;                    // the fuse stays secret
-  return { ...pub, fuseAge: G.fuseStart ? now - G.fuseStart : 0, cdLeft: Math.max(0, (G.cdEnd || 0) - now) };
+  const { fuseEnd, ...pub } = G;
+  return { ...pub, fuseLen: G.fuseEnd && G.fuseStart ? G.fuseEnd - G.fuseStart : 0, fuseAge: G.fuseStart ? now - G.fuseStart : 0, cdLeft: Math.max(0, (G.cdEnd || 0) - now) };
 }
 function hostPush(){ G.seq++; const out = snap(); send({ t: "state", g: out }); applyState(out); }
 function hostStart(){
@@ -512,7 +514,7 @@ function drawMatch(info){
   const iAmOut = me >= 0 && G.players[me].lives <= 0;
   if (!document.getElementById("dguess")) {
     sec.innerHTML = `<div id="dvs"></div>
-      <div class="lane" id="dlane">${G.players.map((_, i) => `<div class="dspi" id="dsp${i}" style="left:${seatX(i)}%"></div>`).join("")}<div class="dball" id="dball">${BIGBALL}</div></div>
+      <div class="lane" id="dlane">${G.players.map((_, i) => `<div class="dspi" id="dsp${i}" style="left:${seatX(i)}%"></div>`).join("")}<div class="dball" id="dball">${BIGBALL}</div><div class="fusebar"><i id="dfuse"></i></div></div>
       <div class="dcard" id="dcard">
       <p class="dturn" id="dturn"></p>
       <span class="eyebrow" id="dtag"></span>
@@ -598,6 +600,9 @@ function frame(){
     const ball = document.getElementById("dball");
     if (ball) {
       const f = age / fuseMax(G.settings);
+      const fz = document.getElementById("dfuse");
+      const len = isHost ? (G.fuseEnd || 0) - (G.fuseStart || 0) : G.fuseLen;   // the host's own copy has the real fuse
+      if (fz) fz.style.width = (len > 0 ? Math.min(1, age * 1000 / len) * 100 : 0) + "%";
       ball.querySelector(".inflate").style.transform = `scale(${(1 + Math.min(f, 1.1) * .8).toFixed(3)})`;
       const st = f < .35 ? 0 : f < .6 ? 1 : f < .8 ? 2 : 3;
       if (!ball.classList.contains("s" + st)) { ball.classList.remove("s0", "s1", "s2", "s3"); ball.classList.add("s" + st); }
