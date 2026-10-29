@@ -287,6 +287,9 @@ footer a{color:var(--muted)}
 .step .sn{white-space:nowrap}
 .score .stamp{font-size:clamp(40px,12vw,84px)}
 @media (max-width:460px){.step .sn{font-size:10px;letter-spacing:0}}
+.logbook{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:4px}
+.logbook p{margin:0;font-family:var(--label);font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.logbook b{color:var(--fg);font-weight:700}
 .aar .bigscore{font-family:var(--display);font-weight:900;font-size:clamp(56px,12vw,96px);line-height:.9;color:var(--accent)}
 .aar .bigscore small{font-size:.4em;color:var(--muted)}
 
@@ -717,7 +720,7 @@ function renderAAR(){
       <div><span class="eyebrow">Top bins</span><span class="v">${S.results.filter(r=>r.tier===4).length}</span></div>
       <div><span class="eyebrow">Screamers</span><span class="v">${S.results.filter(r=>r.tier===3).length}</span></div>
       <div><span class="eyebrow">Offside</span><span class="v">${S.results.filter(r=>r.tier===null).length}</span></div>
-      <div><span class="eyebrow">Best ever</span><span class="v">${st.best}</span></div>
+      <div><span class="eyebrow">Volleys</span><span class="v">${S.results.filter(r=>r.tier===2).length}</span></div>
     </div>
     <h3 class="eyebrow" style="margin:0">Scouting report · tap a round to see every answer</h3>
     <div class="rounds">${S.results.map((r,i)=>{const p=byId(S.ids[i]);const t=tierOf(r);
@@ -725,21 +728,20 @@ function renderAAR(){
       <div><div class="q">${esc(p.q)}</div><div class="a">${r.answer?esc(r.answer.replace(/\s*\(.*\)$/,"")):"—"}</div></div>
       <span class="t" style="color:${t.color}">${t.name} ${t.pts?"+"+t.pts:""}</span><span class="chev" aria-hidden="true">▾</span></summary>
       ${intelFor(p,r.answer)}</details>`;}).join("")}</div>
-    <div class="aarstats">
-      <div><span class="eyebrow">Played</span><span class="v">${st.played}</span></div>
-      <div><span class="eyebrow">Average</span><span class="v">${st.played?Math.round(st.total/st.played):0}</span></div>
-      <div><span class="eyebrow">Best</span><span class="v">${st.best}</span></div>
-      <div><span class="eyebrow">Ballon d'Ors</span><span class="v">${st.ballons}</span></div>
-    </div>
-    <textarea class="share-text" id="shareText" rows="4" readonly aria-label="Share text">${share}</textarea>
     <div class="actions">
       <button class="primary" id="copyBtn" type="button">Copy result</button>
       <span class="countdown" id="countdown"></span>
+    </div>
+    <div class="logbook"><span class="eyebrow">Logbook</span>
+      <p>Streak <b>${st.streak||1}</b> · Played <b>${st.played}</b> · Avg <b>${st.played?Math.round(st.total/st.played):0}</b> · Best <b>${st.best}</b> · Ballon d'Ors <b>${st.ballons}</b></p>
     </div>`;
   $("aar").hidden=false;
   $("copyBtn").onclick = ()=>{
-    const ta=$("shareText");
-    const fallback=()=>{ta.select();toast("Select and copy the text above");};
+    const fallback=()=>{
+      const ta=document.createElement("textarea"); ta.value=share; ta.setAttribute("readonly",""); ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select(); let ok=false; try{ ok=document.execCommand("copy"); }catch(e){} ta.remove();
+      toast(ok?"Copied":"Couldn't copy on this device");
+    };
     try{ navigator.clipboard.writeText(share).then(()=>toast("Copied"),fallback); }catch(e){ fallback(); }
   };
   tickCountdown();
@@ -890,6 +892,7 @@ function next(){
     if(!S.counted){
       const st=store.get(STATS)||{played:0,ballons:0,best:0,total:0};
       st.played++; st.total+=S.score; st.best=Math.max(st.best,S.score); if(S.score>=LEVELS[4].min) st.ballons++;
+      st.streak = st.lastDay===S.day-1 ? (st.streak||0)+1 : (st.lastDay===S.day ? (st.streak||1) : 1); st.lastDay=S.day;
       store.set(STATS,st); S.counted=true;
     }
     save(); render(); window.scrollTo({top:0,behavior:"smooth"}); return;
