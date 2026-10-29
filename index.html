@@ -111,7 +111,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 .ladder{position:relative;padding:28px 6px 48px}
 .track{position:relative;height:10px;background:#06120b;border:1px solid var(--line)}
 .fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--fg);transition:width .6s cubic-bezier(.2,.8,.2,1)}
-.fill.inv{background:var(--accent);box-shadow:0 0 14px var(--accent)}
+.fill.maxed{background:var(--accent);box-shadow:0 0 14px var(--accent)}
 .notch{position:absolute;top:-24px;bottom:-32px;width:0}
 .notch::after{content:"";position:absolute;top:22px;height:14px;border-left:2px solid var(--muted)}
 .notch .n{font-family:var(--display);font-weight:800;font-size:15px;color:var(--muted);transform:translateX(-50%);position:absolute;top:0;left:0;white-space:nowrap}
@@ -229,8 +229,8 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
 footer a{color:var(--muted)}
 
 /* toast + invincible */
-.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-weight:900;font-size:24px;padding:8px 22px;letter-spacing:.03em;text-transform:uppercase;z-index:20;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:calc(100vw - 32px);text-align:center}
-.inv{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:radial-gradient(circle,rgba(255,236,170,.97),rgba(255,210,63,.92) 45%,rgba(40,30,0,.95));color:#1b1500;text-align:center;padding:24px;animation:flash 2.6s ease-out forwards}
+.toast{pointer-events:none;position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-weight:900;font-size:24px;padding:8px 22px;letter-spacing:.03em;text-transform:uppercase;z-index:20;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:calc(100vw - 32px);text-align:center}
+.inv{position:fixed;inset:0;z-index:30;pointer-events:none;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:radial-gradient(circle,rgba(255,236,170,.97),rgba(255,210,63,.92) 45%,rgba(40,30,0,.95));color:#1b1500;text-align:center;padding:24px;animation:flash 2.6s ease-out forwards}
 .inv .big{font-family:var(--display);font-weight:900;font-size:clamp(48px,11vw,110px);line-height:.9;text-transform:uppercase}
 .inv .sub{font-family:var(--label);font-weight:700;font-size:18px;letter-spacing:.2em;text-transform:uppercase}
 @keyframes flash{0%{opacity:0}8%{opacity:1}80%{opacity:1}100%{opacity:0}}
@@ -521,7 +521,7 @@ function renderHud(){
   $("streakV").textContent = S.streak;
   $("bestV").textContent = S.best;
   $("fill").style.width = Math.min(S.streak,25)/25*100+"%";
-  $("fill").classList.toggle("inv",S.streak>=25);
+  $("fill").classList.toggle("maxed",S.streak>=25);
   document.querySelectorAll(".notch").forEach(n=>n.classList.toggle("hit",S.streak>=+n.dataset.at));
   $("feed").innerHTML = S.feed.length ? S.feed.slice().reverse().map(f=>
     f.reward ? `<li class="reward"><span class="w">★ ${f.reward}</span></li>`
