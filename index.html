@@ -330,7 +330,7 @@ footer a{color:var(--muted)}
   <header class="top">
     <div class="brand">
       <h1>WHERE THE <span>SPIDERS</span> LIVE</h1>
-      <p id="dayTag">Daily Premier League deep cuts</p>
+      <p id="dayTag">Daily · SNALL</p>
     </div>
     <nav class="modes" aria-label="Menu">
       <button id="helpBtn" type="button" aria-label="How to play">How to play</button>
@@ -623,7 +623,7 @@ function buildStatic(){
 
 /* ---------- render ---------- */
 function render(){
-  $("dayTag").textContent = `Daily #${S.day} · Premier League deep cuts`;
+  $("dayTag").textContent = `Daily #${S.day} · SNALL`;
   $("lobby").hidden = phase!=="lobby";
   $("game").hidden = phase==="lobby";
   if(phase==="lobby") return renderLobby();
