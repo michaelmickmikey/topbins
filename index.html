@@ -424,7 +424,7 @@ const TIERS = [
    lines:["Sweetly struck. Not everyone remembers that.","That's a proper fan's answer.","Half the pub forgot about that one."]},
   {name:"Screamer",  pts:85,  color:"var(--t3)", emoji:"🟪", desc:"Proper anorak territory.",
    lines:["From 30 yards. Anorak territory.","Somebody owns a stack of old programmes.","That's a Football Manager save answer."]},
-  {name:"Top bins",  pts:100, color:"var(--t4)", emoji:"🎯", desc:"One hidden deep cut, on questions with 20+ answers.",
+  {name:"Top bins",  pts:100, color:"var(--t4)", emoji:"🎯", desc:"The single least-read answer, on questions with 20+ answers.",
    lines:["Top bins. Nobody saw that coming.","Postage stamp. That's the hidden answer.","Where the spiders live. Unreal."]}
 ];
 const OFFSIDE = {name:"Offside", pts:0, color:"var(--danger)", emoji:"🚩"};
@@ -497,10 +497,13 @@ const CACHE = {};
 function entries(p){
   if(CACHE[p.id]) return CACHE[p.id];
   const gem = hasGem(p);
-  const list = gem ? p.a.filter(x=>x[0]!==p.gem) : p.a.slice();
+  // Top bins = the single answer with the fewest Wikipedia reads (questions with 20+ answers only)
+  const sorted = p.a.slice().sort((x,y)=>y[2]-x[2]);
+  const rarest = sorted[sorted.length-1];
+  const list = gem ? sorted.slice(0,-1) : sorted;
   const n=list.length, cut=[Math.ceil(n*.25),Math.ceil(n*.5),Math.ceil(n*.75)];
   const out=list.map((x,i)=>({name:x[0],views:x[2],tier:i<cut[0]?0:i<cut[1]?1:i<cut[2]?2:3,extra:x[1]?x[1].split("|"):[]}));
-  if(gem){ const g=p.a.find(x=>x[0]===p.gem); out.push({name:g[0],views:g[2],tier:4,extra:g[1]?g[1].split("|"):[]}); }
+  if(gem){ const g=rarest; out.push({name:g[0],views:g[2],tier:4,extra:g[1]?g[1].split("|"):[]}); }
   const autoCount={}; const autos=out.map(e=>autoAliases(e.name,p.kind).map(norm).filter(k=>k.length>=3));
   autos.forEach(a=>new Set(a).forEach(k=>autoCount[k]=(autoCount[k]||0)+1));
   const fullKeys=new Set(out.map(e=>norm(e.name)));
