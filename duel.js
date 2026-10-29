@@ -11,7 +11,7 @@ const D = {
   MAX_PLAYERS: 4,
   LIVES: 2, LIVES_MIN: 1, LIVES_MAX: 5,
   MINTURN: 8, MINTURN_MIN: 3, MINTURN_MAX: 15,   // seconds you're guaranteed after receiving the ball
-  FUSE_MIN: 15, FUSE_MAX: 30,                    // hidden fuse per category, seconds
+  FUSE_SPAN: 7, FUSE_CAP: 15,                    // hidden fuse per pass: between min turn and max(min turn + span, cap) seconds
   MIN_ANSWERS: 12,                               // only use prompts with at least this many answers
   POP_PAUSE: 2200,                               // ms to show the burst before the next category
   SB_JS: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js",
@@ -231,8 +231,12 @@ function hostNewPrompt(){
   let p = rand(list);
   if (list.length > 1) { let n = 0; while (p.family === G.lastFamily && n++ < 20) p = rand(list); }
   G.promptId = p.id; G.lastFamily = p.family; G.seen.push(p.id); G.used = [];
+  hostNewFuse();
+}
+const fuseMax = s => Math.max(s.minTurn + D.FUSE_SPAN, D.FUSE_CAP);
+function hostNewFuse(){     // a fresh hidden fuse every time the ball moves
   G.fuseStart = Date.now();
-  G.fuseEnd = G.fuseStart + rnd(D.FUSE_MIN, D.FUSE_MAX) * 1000;
+  G.fuseEnd = G.fuseStart + rnd(G.settings.minTurn, fuseMax(G.settings)) * 1000;
 }
 function snap(){
   const now = Date.now();
@@ -265,8 +269,7 @@ function hostLoseLife(i){                // returns true if the game is over
 }
 function hostPass(from){
   G.turn = nextAlive(from);
-  const floor = Date.now() + G.settings.minTurn * 1000;   // receiver always gets at least the minimum
-  if (G.fuseEnd < floor) G.fuseEnd = floor;
+  hostNewFuse();
 }
 function hostTick(){
   if (!isHost || !G) return;
@@ -395,9 +398,9 @@ function readName(){
 }
 const back = `<button class="ghost" type="button" data-act="leave">Back to the daily</button>`;
 const RULES_HTML = `<ul class="drules">
-  <li>2 to 4 players. Answer the question when you've got the ball.</li>
-  <li>Every answer passes the ball to the next player. A wrong answer or a repeat costs you a life.</li>
-  <li>The ball has a hidden fuse. If it bursts on you, you lose a life and a new category starts.</li>
+  <li>Answer the question when you've got the ball.</li>
+  <li>Every answer passes the ball to the next player. A wrong answer or repeat loses a life.</li>
+  <li>The ball has a fuse. If it bursts before you give a correct answer you lose a life. The fuse resets upon passing.</li>
   <li>Lose all your lives and you're out. Last one standing wins.</li></ul>`;
 function settingsHtml(editable){
   const s = G ? G.settings : loadSettings();
@@ -406,7 +409,7 @@ function settingsHtml(editable){
     : `<div class="stepper ro"><b>${v}${unit}</b></div>`;
   return `<div class="settings"><span class="eyebrow">Game settings${editable ? "" : " (set by the host)"}</span>
     <div class="setrow"><span class="lbl">Lives<small>Each player starts with this many.</small></span>${step("lives", s.lives, D.LIVES_MIN, D.LIVES_MAX, "")}</div>
-    <div class="setrow"><span class="lbl">Minimum turn<small>You always get at least this long once the ball reaches you.</small></span>${step("minTurn", s.minTurn, D.MINTURN_MIN, D.MINTURN_MAX, "s")}</div></div>`;
+    <div class="setrow"><span class="lbl">Minimum turn<small>The fuse never goes off sooner than this after the ball reaches you.</small></span>${step("minTurn", s.minTurn, D.MINTURN_MIN, D.MINTURN_MAX, "s")}</div></div>`;
 }
 function rosterHtml(){
   const me = meIdx();
@@ -419,7 +422,7 @@ function draw(info = {}){
   if (V.screen === "home") {
     sec.innerHTML = `<div class="panel arc">
       <span class="eyebrow">Versus · 2 to 4 players</span>
-      <h2>Don't get caught holding it</h2>
+      <h2 style="text-transform:none">Quit HOGgin'</h2>
       ${RULES_HTML}
       ${nameField()}
       ${avPicker()}
@@ -594,8 +597,9 @@ function frame(){
     const age = (now - fuseStartLocal) / 1000;
     const ball = document.getElementById("dball");
     if (ball) {
-      ball.querySelector(".inflate").style.transform = `scale(${(1 + Math.min(age / D.FUSE_MAX, 1.15) * .8).toFixed(3)})`;
-      const st = age < 8 ? 0 : age < 15 ? 1 : age < 22 ? 2 : 3;
+      const f = age / fuseMax(G.settings);
+      ball.querySelector(".inflate").style.transform = `scale(${(1 + Math.min(f, 1.1) * .8).toFixed(3)})`;
+      const st = f < .35 ? 0 : f < .6 ? 1 : f < .8 ? 2 : 3;
       if (!ball.classList.contains("s" + st)) { ball.classList.remove("s0", "s1", "s2", "s3"); ball.classList.add("s" + st); }
     }
   }
