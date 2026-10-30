@@ -13,6 +13,7 @@ const D = {
   MINTURN: 8, MINTURN_MIN: 3, MINTURN_MAX: 15,   // seconds you're guaranteed after receiving the ball
   FUSE_MAX: 20,                                  // hidden fuse per pass: random between the minimum setting and this many seconds
   MIN_ANSWERS: 12,                               // only use prompts with at least this many answers
+  QCHANGE_AFTER: 2, QCHANGE_CHANCE: .4, QCHANGE_FORCE: 6,   // question can change after 2+ answers (40% each answer), always by 6
   POP_PAUSE: 2200,                               // ms to show the burst before the next category
   SB_JS: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js",
 };
@@ -125,6 +126,13 @@ body.duel-on #lobby, body.duel-on #game, body.duel-on #help{display:none!importa
 .used{display:flex;flex-wrap:wrap;gap:6px}
 .used span{border-left:4px solid var(--c);background:var(--bg);padding:3px 8px;font-family:var(--label);font-weight:600;font-size:15px}
 .used span em{font-style:normal;color:var(--muted);margin-left:5px;font-size:13px}
+.qrev{display:grid;gap:6px}
+.qrev details{background:var(--bg);border:1px solid var(--line)}
+.qrev summary{cursor:pointer;padding:8px 10px;font-weight:600;list-style:none}
+.qrev summary::-webkit-details-marker{display:none}
+.qrev summary small{color:var(--muted);font-weight:400;margin-left:6px}
+.qrev .used{padding:0 10px 10px}
+.qrev .used span.no{opacity:.5}
 .dlog{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:15px;color:var(--muted)}
 .dlog b{color:var(--fg)}
 .cdbig{font-family:var(--display);font-weight:900;font-size:110px;line-height:1;color:var(--accent);text-align:center}
@@ -200,7 +208,7 @@ let lastStateAt = 0;
 const peerSeen = {};                   // host: pid -> last heard (performance.now)
 let fb = { text: "", cls: "" };
 const typing = {};                     // pid -> text
-let hb = 0, tickH = 0, rafH = 0;
+let hb = 0, tickH = 0, rafH = 0, wantRematch = false;
 
 const myName = () => (store.get("tb-name") || "").trim();
 const meIdx = () => G ? G.players.findIndex(p => p.pid === myPid) : -1;
@@ -232,7 +240,8 @@ function hostNewPrompt(){
   const list = pool.length ? pool : BANK.filter(p => p.a.length >= D.MIN_ANSWERS);
   let p = rand(list);
   if (list.length > 1) { let n = 0; while (p.family === G.lastFamily && n++ < 20) p = rand(list); }
-  G.promptId = p.id; G.lastFamily = p.family; G.seen.push(p.id); G.used = [];
+  G.promptId = p.id; G.lastFamily = p.family; G.seen.push(p.id); G.used = []; G.qAnswers = 0;
+  (G.history = G.history || []).push({ id: p.id, used: G.used });   // shares the array, so it fills as answers come in
   hostNewFuse();
 }
 const fuseMax = s => Math.max(s.minTurn, D.FUSE_MAX);
@@ -252,9 +261,17 @@ function hostStart(){
   G.phase = "countdown"; G.cdEnd = Date.now() + 3000;
   G.players.forEach(p => p.lives = G.settings.lives);
   G.turn = Math.floor(Math.random() * G.players.length);
-  G.log = []; G.seen = []; G.used = []; G.winner = null; G.last = null; G.fuseStart = 0; G.promptId = null;
+  G.log = []; G.seen = []; G.used = []; G.history = []; G.ready = []; G.winner = null; G.last = null; G.fuseStart = 0; G.promptId = null;
   fb = { text: "", cls: "" };
   hostPush();
+}
+function hostReady(pid){
+  if (G.phase !== "over") return;
+  G.ready = G.ready || [];
+  if (!G.ready.includes(pid)) G.ready.push(pid);
+  const here = G.players.filter(p => p.pid === myPid || peerSeen[p.pid]);
+  if (here.length >= 2 && here.every(p => G.ready.includes(p.pid))) hostStart();   // everyone's in: same settings, go again
+  else hostPush();
 }
 function hostLog(s){ G.log.unshift(s); G.log = G.log.slice(0, 8); }
 function hostLoseLife(i){                // returns true if the game is over
@@ -315,6 +332,10 @@ function hostGuess(pid, text){
     G.last.out = G.players[i].lives === 0;
     if (!over) hostPass(i);
   }
+  if (G.phase === "live") {
+    G.qAnswers = (G.qAnswers || 0) + 1;
+    if (G.qAnswers >= D.QCHANGE_FORCE || (G.qAnswers >= D.QCHANGE_AFTER && Math.random() < D.QCHANGE_CHANCE)) { hostNewPrompt(); G.last.newQ = true; }
+  }
   G.last.to = G.phase === "live" ? G.turn : null;
   hostPush();
 }
@@ -346,7 +367,8 @@ function onMsg(m){
     }
     else if (m.t === "guess") hostGuess(m.pid, String(m.text || "").slice(0, 60));
     else if (m.t === "typing") { typing[m.pid] = String(m.text || "").slice(0, 40); paintTyping(); }
-    else if (m.t === "bye" && idx >= 0) hostDrop(idx, "left");
+    else if (m.t === "rematch" && idx >= 0) hostReady(m.pid);
+    else if (m.t === "bye" && idx >= 0) { hostDrop(idx, "left"); if (G.phase === "over") hostReady("__check"); }
   } else {
     if (m.t === "state") { lastStateAt = performance.now(); applyState(m.g); }
     else if (m.t === "typing" && m.pid !== myPid) { typing[m.pid] = String(m.text || "").slice(0, 40); paintTyping(); }
@@ -387,6 +409,7 @@ function feedbackFor(ev){
   else if (ev.kind === "miss") fb = { text: `${who}: "${ev.text}" isn't on the list. Life lost.${outTxt}`, cls: "bad" };
   else if (ev.kind === "pop") fb = { text: `${mine ? "It burst on you" : `It burst on ${who}`}! Life lost.${outTxt}`, cls: "bad" };
   else if (ev.kind === "newcat") fb = { text: "New category.", cls: "" };
+  if (ev.newQ) fb.text += " New question!";
 }
 
 /* ---------- rendering ---------- */
@@ -473,6 +496,23 @@ function draw(info = {}){
   bindButtons();
 }
 
+function rematchHtml(){
+  const ready = G.ready || [], me = ready.includes(myPid);
+  const waiting = G.players.filter(p => !ready.includes(p.pid) && p.pid !== myPid).map(p => esc(p.name));
+  const readyNames = G.players.filter(p => ready.includes(p.pid) && p.pid !== myPid).map(p => esc(p.name));
+  const note = me ? (waiting.length ? `You're ready. Waiting for <b>${waiting.join("</b>, <b>")}</b><span class="dots"></span>` : "Starting…")
+    : (readyNames.length ? `<b>${readyNames.join("</b>, <b>")}</b> ${readyNames.length > 1 ? "want" : "wants"} a rematch.` : "Same players, same settings.");
+  return `<div class="row"><button class="deploy" type="button" data-act="rematch" ${me ? "disabled style=\"opacity:.45;animation:none\"" : ""}>${me ? "Ready ✓" : "Rematch"}</button></div><p class="waitline">${note}</p>`;
+}
+function answersHtml(){
+  const h = (G.history || []).filter(x => promptOf(x.id));
+  if (!h.length) return "";
+  return `<span class="eyebrow">The questions · tap to see every answer</span><div class="qrev">${h.map(x => {
+    const p = promptOf(x.id), said = {}; x.used.forEach(u => said[u.name] = G.players[u.by]?.name || "");
+    const all = entries(p).slice().sort((a, b) => b.views - a.views);
+    return `<details><summary>${esc(p.q)}<small>${x.used.length} said · ${all.length} answers</small></summary><div class="used">${all.map(e => `<span class="${e.name in said ? "" : "no"}" style="--c:${(TIERS[e.tier] || TIERS[0]).color}">${esc(e.name)}${e.name in said ? `<em>${esc(said[e.name])}</em>` : ""}</span>`).join("")}</div></details>`;
+  }).join("")}</div>`;
+}
 function lifeIcons(n, max){ return Array.from({ length: max }, (_, i) => LIFE.replace("<svg", `<svg class="${i < n ? "" : "gone"}"`)).join(""); }
 function moodOf(i){
   const p = G.players[i];
@@ -505,7 +545,9 @@ function drawMatch(info){
       ${HAS_SP && w ? `<div style="width:120px">${spr(w.av, "win")}</div>` : ""}
       <p class="winner">${G.winner === me ? "You win" : esc(w ? w.name : "Nobody") + " wins"}</p>
       <ol class="dlog">${G.log.map(l => `<li>${l}</li>`).join("")}</ol>
-      <div class="row">${isHost ? (G.players.length >= 2 ? `<button class="deploy" type="button" data-act="start">Rematch</button>` : "") : `<span class="muted">Waiting for ${esc(G.players[0]?.name || "the host")} to start a rematch…</span>`}${back}</div></div>`;
+      ${answersHtml()}
+      ${rematchHtml()}
+      <div class="row">${back}</div></div>`;
     stopRaf(); bindButtons(); return;
   }
   // live or popped
@@ -651,7 +693,7 @@ async function act(a){
       const t = performance.now();
       G.players.forEach((p, i) => {   // drop anyone we haven't heard from in a while
         if (p.pid === myPid || !peerSeen[p.pid]) return;
-        if (t - peerSeen[p.pid] > 12000) { delete peerSeen[p.pid]; hostDrop(i, G.phase === "lobby" ? "left" : "lost connection"); }
+        if (t - peerSeen[p.pid] > 12000) { delete peerSeen[p.pid]; hostDrop(i, G.phase === "lobby" ? "left" : "lost connection"); if (G.phase === "over") hostReady("__check"); }
       });
     }, 1000);
     clearInterval(tickH); tickH = setInterval(hostTick, 100);
@@ -672,11 +714,14 @@ async function act(a){
     hello();
     clearInterval(hb); hb = setInterval(() => {
       if (!G || meIdx() < 0) hello(); else send({ t: "ping", pid: myPid });
+      if (G && G.phase !== "over") wantRematch = false;
+      else if (wantRematch && G && !(G.ready || []).includes(myPid)) send({ t: "rematch", pid: myPid });   // in case the first one got lost
       if (G && performance.now() - lastStateAt > 10000 && G.phase !== "over") { V = { screen: "join", err: `Lost contact with ${G.players[0]?.name || "the host"}. The game has ended.` }; clearInterval(hb); disconnect(); G = null; return draw(); }
       if (!G && performance.now() - lastStateAt > 30000) { V = { screen: "join", err: "No one's hosting a game with that code. Check it, or ask for a fresh one." }; clearInterval(hb); disconnect(); draw(); }
     }, 1000);
   }
   if (a === "start" && isHost) hostStart();
+  if (a === "rematch" && G && G.phase === "over") { if (isHost) hostReady(myPid); else { wantRematch = true; send({ t: "rematch", pid: myPid }); G.ready = [...(G.ready || []), myPid]; draw(); } }
   if (a === "copycode") { try { await navigator.clipboard.writeText(room); toast("Code copied"); } catch (e) { toast(room); } }
   if (a === "share") {
     const url = shareLink();
